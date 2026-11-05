@@ -5,5 +5,6 @@
   "orchestrator_ref": "823554b4c62a26d73554ae650980d4c65ce562db",
   "simcontrol_ref": "6c095b97ff1b5eed90777ccd15a53726b2ce86e2",
   "zenoh_version": "1.10.2",
-  "distribution_status": "local branches; publication approval pending"
+  "orchestrator_pull_request": "https://github.com/cornellev/orchestrator/pull/1",
+  "distribution_status": "orchestrator draft PR published; simulator kept local"
 }

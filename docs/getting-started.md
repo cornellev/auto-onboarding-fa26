@@ -13,31 +13,34 @@ Protobuf compiler, or Linux VM is needed for the exercises.
 
 ## Install simulator and orchestrator together
 
-Use the simulator and orchestrator revisions recorded in `config/services.json`.
-On macOS/Linux, run the simulator's combined installer from its desired parent directory:
-
-The service revisions are committed locally on `cev-onboarding-protobuf` branches.
-Publication is awaiting explicit approval; the GitHub installation command becomes
-usable after those branches are published. For local review, use the service checkouts
-described in the [local service handoff](service-changes.md). Existing modified installations are refused when selecting
-an exact revision; use a clean directory. Open new terminals after installation.
-There is no separate orchestrator clone, pip, or virtualenv activation step on this path.
-
+Use the revisions recorded in `config/services.json`. Orchestrator is available in
+[draft PR #1](https://github.com/cornellev/orchestrator/pull/1); the simulator changes
+remain local in `services/sim`. The command below uses that local source with the
+existing combined installer. Run it from this onboarding checkout on macOS/Linux.
+See the [service handoff](service-changes.md) for the local checkout locations.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/cornellev/ev-sim/4a182c7921448d981d0b5d4543268e348ca251af/install.sh \
-  | bash -s -- --ref 4a182c7921448d981d0b5d4543268e348ca251af --onboarding \
-    --orchestrator-ref 823554b4c62a26d73554ae650980d4c65ce562db --orchestrator-dir "$HOME/cev/orchestrator"
+EV_SIM_REPO="$PWD/services/sim" bash services/sim/install.sh \
+  --dir "$HOME/cev/ev-sim-onboarding" \
+  --ref 4a182c7921448d981d0b5d4543268e348ca251af --onboarding \
+  --orchestrator-ref 823554b4c62a26d73554ae650980d4c65ce562db \
+  --orchestrator-dir "$HOME/cev/orchestrator"
 ```
+
+Existing modified installations are refused when selecting an exact revision;
+use a clean directory. Open new terminals after installation. There is no separate
+orchestrator clone, pip, or virtualenv activation step on this path. A GitHub-only
+simulator installation cannot fetch the local simulator revision yet.
 
 <details>
 <summary>Native Windows setup</summary>
 
-Install Node 22.22.2 and Python 3.12, then use PowerShell. Use the revisions from
-`config/services.json` in the two checkout commands:
+Install Node 22.22.2 and Python 3.12, then use PowerShell from this onboarding
+checkout. The local simulator source must be available at `services/sim`; it is
+not included in a fresh GitHub clone. Use the revisions from `config/services.json`:
 
 ```powershell
-git clone https://github.com/cornellev/ev-sim.git
+git clone ./services/sim ev-sim
 git -C ev-sim checkout 4a182c7921448d981d0b5d4543268e348ca251af
 cd ev-sim
 npm ci

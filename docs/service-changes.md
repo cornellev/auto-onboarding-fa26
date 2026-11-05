@@ -9,10 +9,11 @@ Exact source revisions are in `config/services.json`. The Rust `simcontrol` clie
 keeps its tested base revision because its lifecycle API did not change. Simulator
 and orchestrator service revisions include the new transport and installation work.
 
-GitHub publication is awaiting explicit approval. Automatic approval review rejected
-the push because implementation authorization did not explicitly include exporting
-source to the two GitHub repositories. No pull request or remote branch was created.
-The GitHub installation command and CI service checkouts require publication first.
+Orchestrator is published in [draft PR #1](https://github.com/cornellev/orchestrator/pull/1)
+at the pinned revision. The simulator branch remains local, as requested; it has
+not been pushed and has no pull request. Use its local checkout for installation
+and integration checks. Remote combined installation and transport CI still require
+the simulator revision to be distributed.
 
 For immediate local verification, install Python dependencies into a Python 3.12
 environment, then run from the onboarding root:

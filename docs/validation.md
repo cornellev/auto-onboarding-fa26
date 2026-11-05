@@ -51,8 +51,13 @@ installer behavior or weaken student acceptance criteria.
 
 ## Remaining release gates
 
-- GitHub publication of the two implementation branches requires explicit approval.
-  Until then, remote installation and CI cannot fetch the new service revisions.
+- Orchestrator is published in [draft PR #1](https://github.com/cornellev/orchestrator/pull/1).
+  The simulator remains local by request. Remote combined installation and transport
+  CI cannot fetch that simulator revision; use the local integration check instead.
+- Hosted orchestrator Linux Python CI passes all 57 tests. Windows exposes a
+  two-second real-socket timeout in the unchanged client lifecycle test; matrix
+  fail-fast cancels macOS. The legacy cross-language job fails on Node 20 module
+  loading in the unchanged JavaScript client. These checks remain enabled.
 - Native Windows/Linux installation and browser execution have not been exercised
   locally. Cross-platform Rust and transport jobs are configured for all three OSes.
 - Empty/detour autonomous goal arrival requires completed student algorithms.
