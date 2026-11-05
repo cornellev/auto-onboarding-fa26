@@ -19,7 +19,7 @@ jobs:
         run: |
           cargo run --locked --example generate_schema
           cargo fmt
-          git diff --exit-code -- src/generated proto config/protobuf-profile.json
+          git diff --exit-code -- src/shared/generated proto config/protobuf-profile.json
   msrv:
     runs-on: ubuntu-latest
     steps:

@@ -1,6 +1,6 @@
 use crate::{
-    grid::Grid,
-    types::{Path, Point2, VehicleState},
+    shared::grid::Grid,
+    shared::types::{Path, Point2, VehicleState},
 };
 
 #[derive(Default)]

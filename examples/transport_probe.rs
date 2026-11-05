@@ -1,5 +1,5 @@
 //! Maintainer interoperability probe; these unrelated types exercise generic routing.
-use cev_onboarding::{transport::Transport, Result};
+use cev_onboarding::{shared::transport::Transport, Result};
 use prost::Message;
 use zenoh::Wait;
 #[derive(Clone, PartialEq, Message)]

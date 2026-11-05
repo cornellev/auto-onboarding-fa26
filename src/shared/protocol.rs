@@ -1,5 +1,5 @@
 //! Wire conversion and freshness checks. Algorithms keep ordinary Rust structs.
-use crate::{error, types::*, Result};
+use crate::{error, shared::types::*, Result};
 use prost::Message;
 use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha256};
@@ -9,7 +9,7 @@ use std::time::Instant;
 pub mod pb {
     include!("generated/cev.onboarding.v1.rs");
 }
-pub const DESCRIPTOR: &[u8] = include_bytes!("../proto/autonomy.binpb");
+pub const DESCRIPTOR: &[u8] = include_bytes!("../../proto/autonomy.binpb");
 pub const FRESH_NS: u64 = 300_000_000;
 
 pub fn fingerprint() -> String {

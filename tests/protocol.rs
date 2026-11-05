@@ -1,13 +1,12 @@
 use cev_onboarding::{
-    protocol::{self, pb, Freshness},
-    transport::ObservationJoin,
-    types::*,
+    shared::protocol::{self, pb, Freshness},
+    shared::types::*,
 };
 use prost::Message;
 #[test]
 fn exact_timestamps_and_physical_types_round_trip() {
     let observation: Observation =
-        serde_json::from_str(include_str!("../fixtures/perception.json")).unwrap();
+        serde_json::from_str(include_str!("../fixtures/perception/observation.json")).unwrap();
     let mut wire: pb::Observation = protocol::convert(&observation).unwrap();
     wire.time_ns = u64::MAX;
     let decoded: pb::Observation = protocol::decode(&wire.encode_to_vec()).unwrap();
@@ -30,28 +29,4 @@ fn freshness_rejects_reordering_and_old_sources() {
     assert!(f.accept(&h).is_err());
     assert!(f.accept(&protocol::header("run", 2, 99, "map")).is_err());
     assert!(protocol::check_header(&Some(h), "other", "map").is_err());
-}
-#[test]
-fn observation_join_is_capture_exact_and_latest_only() {
-    let observation: Observation =
-        serde_json::from_str(include_str!("../fixtures/perception.json")).unwrap();
-    let mut join = ObservationJoin::new();
-    join.scan(
-        protocol::header("run", 1, 100, "front_lidar_frame"),
-        observation.scan.clone(),
-    );
-    join.state(protocol::header("run", 2, 101, "map"), observation.state);
-    assert!(join.take().is_none());
-    join.state(protocol::header("run", 1, 100, "map"), observation.state);
-    assert_eq!(join.take().unwrap().2.time_ns, 100);
-    assert!(join.take().is_none());
-    for t in 101..200 {
-        join.scan(
-            protocol::header("run", t, t, "front_lidar_frame"),
-            observation.scan.clone(),
-        );
-        join.state(protocol::header("run", t, t, "map"), observation.state);
-    }
-    assert_eq!(join.take().unwrap().2.time_ns, 199);
-    assert!(join.take().is_none());
 }

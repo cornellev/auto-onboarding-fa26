@@ -1,4 +1,6 @@
-use cev_onboarding::{grid::Grid, runner::validate_path, student::planning::Planner, types::*};
+use cev_onboarding::{
+    planning::validation::validate_path, planning::Planner, shared::grid::Grid, shared::types::*,
+};
 use serde::Deserialize;
 #[derive(Deserialize)]
 struct Fixture {
@@ -12,8 +14,8 @@ struct Fixture {
 #[ignore = "Student acceptance: implement Planner::plan, then run cargo test --test planning -- --ignored"]
 fn reachable_courses_produce_valid_paths() {
     for json in [
-        include_str!("../fixtures/planning-empty.json"),
-        include_str!("../fixtures/planning-detour.json"),
+        include_str!("../../fixtures/planning/empty.json"),
+        include_str!("../../fixtures/planning/detour.json"),
     ] {
         let f: Fixture = serde_json::from_str(json).unwrap();
         let path = Planner::default()
@@ -34,6 +36,6 @@ fn reachable_courses_produce_valid_paths() {
 #[ignore = "Student acceptance: implement Planner::plan"]
 fn blocked_goal_returns_none() {
     let f: Fixture =
-        serde_json::from_str(include_str!("../fixtures/planning-blocked.json")).unwrap();
+        serde_json::from_str(include_str!("../../fixtures/planning/blocked.json")).unwrap();
     assert!(Planner::default().plan(&f.grid, &f.start, f.goal).is_none());
 }

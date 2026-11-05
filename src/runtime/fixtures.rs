@@ -1,9 +1,9 @@
 //! Transport exercises use their own namespace and have no actuator binding.
 use crate::{
-    grid::Grid,
-    protocol::{self, pb},
-    transport::Transport,
-    types::*,
+    shared::grid::Grid,
+    shared::protocol::{self, pb},
+    shared::transport::Transport,
+    shared::types::*,
     Result,
 };
 use std::{
@@ -24,8 +24,8 @@ pub fn publish(
     }
     let run = run.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let io = Transport::connect(&run)?;
-    let course: crate::runner::Course =
-        serde_json::from_str(include_str!("../scenarios/empty.json"))?;
+    let course: crate::runtime::runner::Course =
+        serde_json::from_str(include_str!("../../scenarios/empty.json"))?;
     let info = pb::RunInfo {
         header: Some(protocol::header(&run, 1, 0, "map")),
         schema_hash: protocol::fingerprint(),
@@ -44,13 +44,14 @@ pub fn publish(
         },
     };
     let observation: Observation =
-        serde_json::from_str(include_str!("../fixtures/perception.json"))?;
+        serde_json::from_str(include_str!("../../fixtures/perception/observation.json"))?;
     #[derive(serde::Deserialize)]
     struct Planning {
         grid: Grid,
         start: VehicleState,
     }
-    let planning: Planning = serde_json::from_str(include_str!("../fixtures/planning-empty.json"))?;
+    let planning: Planning =
+        serde_json::from_str(include_str!("../../fixtures/planning/empty.json"))?;
     println!(
         "Fixture run: {run}; no simulator or actuator connection. Start node {role} --run {run}"
     );

@@ -1,6 +1,6 @@
 //! Maintainer-owned boundary. Implement this on the Pi; no desktop GPIO dependencies.
 use crate::{
-    types::{DriveCommand, Observation, VehicleSpec},
+    shared::types::{DriveCommand, Observation, VehicleSpec},
     Result,
 };
 use std::time::Duration;

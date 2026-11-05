@@ -1,4 +1,4 @@
-use crate::{grid::Grid, types::Observation};
+use crate::{shared::grid::Grid, shared::types::Observation};
 
 pub struct Perception {
     pub map: Grid,

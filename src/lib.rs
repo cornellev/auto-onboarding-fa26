@@ -1,14 +1,8 @@
-pub mod fixtures;
-pub mod grid;
-pub mod hardware;
-pub mod nodes;
-pub mod protocol;
-pub mod reporting;
-pub mod runner;
-pub mod sim;
-pub mod student;
-pub mod transport;
-pub mod types;
+pub mod controls;
+pub mod perception;
+pub mod planning;
+pub mod runtime;
+pub mod shared;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, Error>;

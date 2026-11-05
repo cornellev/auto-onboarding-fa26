@@ -1,14 +1,15 @@
 use cev_onboarding::{
     error,
-    grid::Grid,
-    hardware::VehicleIo,
-    protocol::{self, pb},
-    reporting::Reporter,
-    runner::{Course, Mode, Update},
-    sim::Sim,
-    student::{perception::Perception, planning::Planner},
-    transport,
-    types::*,
+    perception::Perception,
+    planning::Planner,
+    runtime::hardware::VehicleIo,
+    runtime::reporting::Reporter,
+    runtime::runner::{Course, Mode, Update},
+    runtime::sim::Sim,
+    shared::grid::Grid,
+    shared::protocol::{self, pb},
+    shared::transport,
+    shared::types::*,
     Result,
 };
 use serde::Deserialize;
@@ -85,8 +86,8 @@ fn run() -> Result<()> {
         return Err(error("Duration must be finite and positive"));
     }
     if mode == "setup" {
-        cev_onboarding::sim::setup(&server)?;
-        return cev_onboarding::sim::setup_profile();
+        cev_onboarding::runtime::sim::setup(&server)?;
+        return cev_onboarding::runtime::sim::setup_profile();
     }
     let interrupted = Arc::new(AtomicBool::new(false));
     let signal = interrupted.clone();
@@ -94,16 +95,16 @@ fn run() -> Result<()> {
     if mode == "node" {
         let run = run_id.ok_or_else(|| error("node requires --run <id>"))?;
         let role = node_role.as_deref().unwrap();
-        let ctx = cev_onboarding::nodes::Context::connect(role, &run, interrupted)?;
+        let ctx = cev_onboarding::runtime::node::Context::connect(role, &run, interrupted)?;
         return match role {
-            "perception" => cev_onboarding::nodes::perception::run(ctx),
-            "planning" => cev_onboarding::nodes::planning::run(ctx),
-            "controls" => cev_onboarding::nodes::controls::run(ctx),
+            "perception" => cev_onboarding::perception::node::run(ctx),
+            "planning" => cev_onboarding::planning::node::run(ctx),
+            "controls" => cev_onboarding::controls::node::run(ctx),
             _ => Err(error("Unknown node role")),
         };
     }
     if mode == "fixture-publish" {
-        return cev_onboarding::fixtures::publish(
+        return cev_onboarding::runtime::fixtures::publish(
             node_role.as_deref().unwrap(),
             run_id,
             duration,
@@ -123,7 +124,7 @@ fn run() -> Result<()> {
     let mut reporter = Reporter::new(PathBuf::from("results").join(format!("{mode}-{stamp}")))?;
     if mode == "perception" {
         let observation: Observation =
-            load(fixture.unwrap_or_else(|| "fixtures/perception.json".into()))?;
+            load(fixture.unwrap_or_else(|| "fixtures/perception/observation.json".into()))?;
         observation.validate()?;
         let mut perception = Perception::new(course.grid.clone());
         let map = perception.update(&observation);
@@ -146,12 +147,12 @@ fn run() -> Result<()> {
             vehicle: VehicleSpec,
         }
         let fixture: Fixture =
-            load(fixture.unwrap_or_else(|| format!("fixtures/planning-{scenario}.json")))?;
+            load(fixture.unwrap_or_else(|| format!("fixtures/planning/{scenario}.json")))?;
         fixture.grid.validate()?;
         fixture.vehicle.validate()?;
         let path = Planner::default().plan(&fixture.grid, &fixture.start, fixture.goal);
         if let Some(path) = &path {
-            cev_onboarding::runner::validate_path(
+            cev_onboarding::planning::validation::validate_path(
                 &fixture.grid,
                 path,
                 fixture.start.pose.position,
@@ -340,7 +341,7 @@ fn run() -> Result<()> {
                     }
                     Mode::Controls => {
                         if !controls_path_checked {
-                            cev_onboarding::runner::validate_path(
+                            cev_onboarding::planning::validation::validate_path(
                                 &course.grid,
                                 &course.control_path,
                                 observation.state.pose.position,

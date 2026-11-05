@@ -2,7 +2,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = prost_build::Config::new();
     config.protoc_executable(protoc_bin_vendored::protoc_bin_path()?);
     config.type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]");
-    config.out_dir("src/generated");
+    config.out_dir("src/shared/generated");
     config.file_descriptor_set_path("proto/autonomy.binpb");
     config.compile_protos(&["proto/autonomy.proto"], &["proto"])?;
     use base64::Engine;

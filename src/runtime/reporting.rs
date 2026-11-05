@@ -1,4 +1,4 @@
-use crate::{grid::Grid, runner::Update, types::*, Result};
+use crate::{runtime::runner::Update, shared::grid::Grid, shared::types::*, Result};
 use serde::Serialize;
 use std::{
     fs::{self, File},

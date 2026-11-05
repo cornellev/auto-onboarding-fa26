@@ -1,9 +1,10 @@
 //! Worked transport example; the mapping algorithm remains a student task.
-use super::Context;
+use crate::runtime::node::Context;
 use crate::{
-    protocol::{self, pb, Freshness},
-    student::perception::Perception,
-    transport::{self, ObservationJoin},
+    perception::synchronizer::ObservationJoin,
+    perception::Perception,
+    shared::protocol::{self, pb, Freshness},
+    shared::transport,
     Result,
 };
 use prost::Message;

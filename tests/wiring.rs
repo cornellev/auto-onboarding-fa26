@@ -1,6 +1,6 @@
 use cev_onboarding::{
-    protocol::pb,
-    transport::{self, Transport},
+    shared::protocol::pb,
+    shared::transport::{self, Transport},
 };
 use std::{
     process::{Child, Command},

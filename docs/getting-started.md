@@ -1,7 +1,8 @@
 # Getting started
 
-Budget the first session for setup. Algorithm work stays in three student modules;
-planning and controls also have short transport loops to wire.
+Budget the first session for setup. Each component lives in
+`src/{perception,planning,controls}/`: edit `algorithm.rs` for algorithms and
+`node.rs` for planning/controls transport loops. Perception's node is the example.
 
 ## Tools
 
@@ -130,7 +131,7 @@ A fixture runs for 60 seconds unless `--duration` is supplied.
 For live controls and integration:
 
 ```sh
-cargo run -- controls --path fixtures/path-curve.json
+cargo run -- controls --path fixtures/controls/curve.json
 cargo run -- autonomous --scenario detour
 ```
 

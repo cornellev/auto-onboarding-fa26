@@ -1,9 +1,7 @@
 use cev_onboarding::{
-    grid::Grid,
-    hardware::validate_hardware_spec,
-    reporting::tracking_error,
-    runner::{validate_path, Course},
-    types::*,
+    planning::validation::validate_path, runtime::hardware::validate_hardware_spec,
+    runtime::reporting::tracking_error, runtime::runner::Course, shared::grid::Grid,
+    shared::types::*,
 };
 
 fn course() -> Course {
@@ -124,9 +122,7 @@ fn stop_defaults_nonfinite_rejection_and_command_limits() {
 
 #[test]
 fn unfinished_algorithms_are_safe_and_independent() {
-    use cev_onboarding::student::{
-        controls::Controller, perception::Perception, planning::Planner,
-    };
+    use cev_onboarding::{controls::Controller, perception::Perception, planning::Planner};
     let course = course();
     let obs = observation(100_000_000);
     assert!(Perception::new(course.grid.clone()).update(&obs).is_none());

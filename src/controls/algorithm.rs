@@ -1,4 +1,4 @@
-use crate::types::{DriveCommand, Point2, VehicleSpec, VehicleState};
+use crate::shared::types::{DriveCommand, Point2, VehicleSpec, VehicleState};
 
 pub struct Controller {
     pub vehicle: VehicleSpec,

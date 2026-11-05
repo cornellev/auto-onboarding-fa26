@@ -57,7 +57,7 @@ fn student_navigation_reaches_empty_and_detour_without_scenario_failure() {
 fn student_follows_straight_and_gentle_curve() {
     for args in [
         vec!["controls"],
-        vec!["controls", "--path", "fixtures/path-curve.json"],
+        vec!["controls", "--path", "fixtures/controls/curve.json"],
     ] {
         let summary = run(&args);
         assert_eq!(summary["goal_reached"], true);
@@ -69,7 +69,9 @@ fn student_follows_straight_and_gentle_curve() {
 #[test]
 #[ignore = "Live safety test; requires one browser and installed courses; run with --test-threads=1"]
 fn candidate_watchdog_stops_when_commands_stop() {
-    use cev_onboarding::{hardware::VehicleIo, runner::Course, sim::Sim, types::*};
+    use cev_onboarding::{
+        runtime::hardware::VehicleIo, runtime::runner::Course, runtime::sim::Sim, shared::types::*,
+    };
     use std::time::{Duration, Instant};
     let course: Course = serde_json::from_str(include_str!("../scenarios/empty.json")).unwrap();
     let server = std::env::var("CEV_SIM_SERVER").unwrap_or_else(|_| "http://localhost:3000".into());

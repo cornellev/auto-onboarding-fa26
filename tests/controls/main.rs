@@ -1,9 +1,10 @@
-use cev_onboarding::{student::controls::Controller, types::*};
+use cev_onboarding::{controls::Controller, shared::types::*};
 
 #[test]
 #[ignore = "Student acceptance: implement Controller::command, then run cargo test --test controls -- --ignored"]
 fn empty_path_stops_and_steering_corrects_both_sides() {
-    let spec: VehicleSpec = serde_json::from_str(include_str!("../fixtures/vehicle.json")).unwrap();
+    let spec: VehicleSpec =
+        serde_json::from_str(include_str!("../../fixtures/vehicle.json")).unwrap();
     let mut controller = Controller::new(spec.clone());
     let mut state = VehicleState::default();
     assert_eq!(controller.command(&state, &[], 0.1), DriveCommand::STOP);

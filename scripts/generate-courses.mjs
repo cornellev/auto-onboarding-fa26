@@ -14,7 +14,9 @@ const write = async (file, value) => writeFile(path.join(root, file), JSON.strin
 try {
   const storage = new StorageService(scratch);
   await mkdir(path.join(root, 'scenarios'), { recursive: true });
-  await mkdir(path.join(root, 'fixtures'), { recursive: true });
+  for (const component of ['perception', 'planning', 'controls']) {
+    await mkdir(path.join(root, 'fixtures', component), { recursive: true });
+  }
   const vehicleId = 'onboarding-training';
   // Synthetic dimensions, explicitly NOT measurements of the physical minicar.
   const vehicle = await storage.createVehicleManifest({
@@ -91,11 +93,11 @@ try {
     const map = grid(cells);
     const course={manifest_id:id,resolved_hash:bundle.resolved.resolvedHash,goal:{x:8,y:0},goal_tolerance_m:.2,timeout_s:90,vehicle:spec,grid:grid(),control_path:controls};
     await write(`scenarios/${name}.json`,course);
-    await write(`fixtures/planning-${name}.json`,{grid:map,start:{pose:{position:{x:1,y:0},yaw_rad:0},speed_mps:0},goal:course.goal,vehicle:spec});
+    await write(`fixtures/planning/${name}.json`,{grid:map,start:{pose:{position:{x:1,y:0},yaw_rad:0},speed_mps:0},goal:course.goal,vehicle:spec});
     console.log(`${name}: ${bundle.resolved.resolvedHash}`);
   }
   // Small analytically known sensor fixture, not a mapping implementation.
-  await write('fixtures/perception.json', {time_ns:100_000_000,state:{pose:{position:{x:1,y:0},yaw_rad:Math.PI/2},speed_mps:0},
+  await write('fixtures/perception/observation.json', {time_ns:100_000_000,state:{pose:{position:{x:1,y:0},yaw_rad:Math.PI/2},speed_mps:0},
     scan:{points:[{x:1,y:0},{x:1,y:0},{x:2,y:-1}],sensor_in_vehicle:{position:{x:.1,y:0},yaw_rad:0}}});
-  await write('fixtures/path-curve.json',[{x:1,y:0},{x:2,y:0},{x:3,y:.3},{x:4,y:.8},{x:5,y:1},{x:6,y:.8},{x:7,y:.3},{x:8,y:0}]);
+  await write('fixtures/controls/curve.json',[{x:1,y:0},{x:2,y:0},{x:3,y:.3},{x:4,y:.8},{x:5,y:1},{x:6,y:.8},{x:7,y:.3},{x:8,y:0}]);
 } finally { await rm(scratch,{recursive:true,force:true}); }

@@ -17,13 +17,13 @@ The simulator internally uses Three.js x/z. The adapter handles that boundary. D
 
 **Problem:** Which map cells contain observed obstacles?
 
-Edit `src/student/perception.rs`. `update(&Observation)` updates the map held by your `Perception` struct and returns `Some(&self.map)` when ready. The starter returns `None`.
+Edit `src/perception/algorithm.rs`. `update(&Observation)` updates the map held by your `Perception` struct and returns `Some(&self.map)` when ready. The starter returns `None`.
 
 Minimum: process valid scan endpoints, handle the sensor mounting offset and vehicle heading, mark obstacle cells, ignore out-of-map hits, and tolerate empty scans. Repeated observations should preserve the static map. The runner supplies an initially empty grid.
 
 ```sh
 cargo run -- perception
-cargo run -- perception --fixture fixtures/perception.json
+cargo run -- perception --fixture fixtures/perception/observation.json
 cargo test --test perception -- --ignored
 ```
 
@@ -43,7 +43,7 @@ Explore later: free-space ray tracing, explicit unknown cells, probabilistic occ
 
 **Problem:** Which route can the car follow from its current location to the goal?
 
-Edit `src/student/planning.rs`. Return `Some(path)` for a reachable goal, or `None` when no route is available. Start with BFS if it makes the graph-search idea clearer; A* is the suggested next step. Other methods are welcome.
+Edit `src/planning/algorithm.rs`. Return `Some(path)` for a reachable goal, or `None` when no route is available. Start with BFS if it makes the graph-search idea clearer; A* is the suggested next step. Other methods are welcome.
 
 Minimum: avoid obstacles and map boundaries, account for the car's size, reconstruct a world-coordinate path, and handle unreachable goals. Your implementation must pass both reachable fixtures and the blocked fixture.
 
@@ -72,14 +72,14 @@ Explore later: smoothing, better heuristics, turning-radius constraints, RRT*, o
 
 **Problem:** Which speed and steering should move the car along the supplied path?
 
-Edit `src/student/controls.rs`. Your struct receives the vehicle specification and can hold progress/state. The starter returns `DriveCommand::STOP`.
+Edit `src/controls/algorithm.rs`. Your struct receives the vehicle specification and can hold progress/state. The starter returns `DriveCommand::STOP`.
 
 Minimum: select a forward target, steer toward it, choose a bounded forward speed, and stop for an empty path. The runner handles goal completion and the external safety limits.
 
 ```sh
 cargo test --test controls -- --ignored
 cargo run -- controls
-cargo run -- controls --path fixtures/path-curve.json
+cargo run -- controls --path fixtures/controls/curve.json
 ```
 
 These paths are fixtures; neither your perception nor your planner is called. The existing simulator supplies all vehicle dynamics.
@@ -108,21 +108,22 @@ Perception's node is the worked transport example. It explicitly declares bounde
 Zenoh subscribers and a Protobuf publisher. Keep its algorithm unfinished until you
 complete the perception challenge.
 
-Implement transport in `src/nodes/planning.rs` and `src/nodes/controls.rs`. The
-provided `Context` opens the configured session and loads the immutable RunInfo.
-Use its `transport.session`, `transport.key(...)`, and generated `protocol::pb`
-types. `prost::Message` encodes/decodes binary Protobuf. `transport::receive` is a
-bounded-subscription decoding helper. `Context::poll` handles shutdown and run loss.
+Implement transport in `src/planning/node.rs` and `src/controls/node.rs`. The
+provided `runtime::node::Context` opens the configured session and loads the
+immutable RunInfo. Use its `transport.session`, `transport.key(...)`, and generated
+`shared::protocol::pb` types. `prost::Message` encodes/decodes binary Protobuf.
+`transport::receive` is a bounded-subscription decoding helper in
+`shared::transport`. `Context::poll` handles shutdown and run loss.
 
 Planning owns a map subscriber, path publisher, and persistent `Planner`. Every map
 update needs a result, including unavailable/no-path updates that clear older paths.
-`nodes::planned_update` invokes the algorithm and validates endpoints, clearance,
-and segments before constructing a result with source metadata intact.
+`planning::node::planned_update` invokes the algorithm and validates endpoints,
+clearance, and segments before constructing a result with source metadata intact.
 
 Controls owns state/path subscribers, a command publisher, and persistent Controller.
 Keep the latest path, including unavailable results. Run once per fresh state at
-10 Hz; compute `dt_s` from capture time. `nodes::controlled_update` creates a safe
-command and retains the path's source deadline. Stop for missing or expired paths.
+10 Hz; compute `dt_s` from capture time. `controls::node::controlled_update` creates a
+safe command and retains the path's source deadline. Stop for missing or expired paths.
 Never stamp an old path as though it came from a new observation. Publish node
 status with `Context::status` so mentors can distinguish wiring from algorithms.
 

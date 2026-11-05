@@ -1,9 +1,10 @@
 use crate::{
-    hardware::VehicleIo,
-    protocol::{self, pb},
-    runner::Course,
-    transport::{self, ObservationJoin, Subscription, Transport},
-    types::*,
+    perception::synchronizer::ObservationJoin,
+    runtime::hardware::VehicleIo,
+    runtime::runner::Course,
+    shared::protocol::{self, pb},
+    shared::transport::{self, Subscription, Transport},
+    shared::types::*,
     Result,
 };
 use std::{
@@ -205,7 +206,7 @@ fn request_with_token(
 
 pub fn setup_profile() -> Result<()> {
     let profile: serde_json::Value =
-        serde_json::from_str(include_str!("../config/protobuf-profile.json"))?;
+        serde_json::from_str(include_str!("../../config/protobuf-profile.json"))?;
     if profile["fingerprint"].as_str() != Some(&protocol::fingerprint()) {
         return Err(crate::error(
             "Regenerate schema and profile with cargo run --example generate_schema",

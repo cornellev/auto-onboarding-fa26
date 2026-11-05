@@ -1,4 +1,4 @@
-use crate::{types::Point2, Result};
+use crate::{shared::types::Point2, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

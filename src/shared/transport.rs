@@ -1,8 +1,5 @@
 //! A session and bounded subscribers, with explicit loopback routing.
-use crate::{
-    protocol::{decode, pb},
-    Result,
-};
+use crate::{shared::protocol::decode, Result};
 use prost::Message;
 use zenoh::{
     handlers::{RingChannel, RingChannelHandler},
@@ -63,55 +60,4 @@ pub fn receive<M: Message + Default>(
     sub.recv_timeout(timeout)?
         .map(|s| decode(&s.payload().to_bytes()))
         .transpose()
-}
-
-/// Join only exact capture times. Different scan/pose arrival orders are supported.
-pub struct ObservationJoin {
-    states: std::collections::BTreeMap<u64, (pb::Header, crate::types::VehicleState)>,
-    scans: std::collections::BTreeMap<u64, (pb::Header, crate::types::LidarScan)>,
-}
-impl Default for ObservationJoin {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-impl ObservationJoin {
-    pub fn new() -> Self {
-        Self {
-            states: Default::default(),
-            scans: Default::default(),
-        }
-    }
-    pub fn state(&mut self, h: pb::Header, state: crate::types::VehicleState) {
-        self.states.insert(h.time_ns, (h, state));
-        while self.states.len() > 32 {
-            self.states.pop_first();
-        }
-    }
-    pub fn scan(&mut self, h: pb::Header, scan: crate::types::LidarScan) {
-        self.scans.insert(h.time_ns, (h, scan));
-        while self.scans.len() > 8 {
-            self.scans.pop_first();
-        }
-    }
-    pub fn take(&mut self) -> Option<(pb::Header, pb::Header, crate::types::Observation)> {
-        let time = self
-            .scans
-            .keys()
-            .rev()
-            .find(|t| self.states.contains_key(t))
-            .copied()?;
-        let (scan_h, scan) = self.scans.remove(&time)?;
-        let (state_h, state) = self.states.get(&time)?.clone();
-        self.scans.retain(|t, _| *t > time);
-        Some((
-            scan_h,
-            state_h,
-            crate::types::Observation {
-                time_ns: time,
-                state,
-                scan,
-            },
-        ))
-    }
 }
