@@ -1,0 +1,36 @@
+{
+  "time_ns": 100000000,
+  "state": {
+    "pose": {
+      "position": {
+        "x": 1,
+        "y": 0
+      },
+      "yaw_rad": 1.5707963267948966
+    },
+    "speed_mps": 0
+  },
+  "scan": {
+    "points": [
+      {
+        "x": 1,
+        "y": 0
+      },
+      {
+        "x": 1,
+        "y": 0
+      },
+      {
+        "x": 2,
+        "y": -1
+      }
+    ],
+    "sensor_in_vehicle": {
+      "position": {
+        "x": 0.1,
+        "y": 0
+      },
+      "yaw_rad": 0
+    }
+  }
+}

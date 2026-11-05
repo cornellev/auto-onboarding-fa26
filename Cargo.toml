@@ -1,0 +1,19 @@
+[package]
+name = "cev-onboarding"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+simcontrol = { git = "https://github.com/cornellev/ev-sim", rev = "6c095b97ff1b5eed90777ccd15a53726b2ce86e2" }
+orchestrator-protocol = { git = "https://github.com/cornellev/orchestrator", rev = "c6fe352fd5cdee3b8f70a5695b1b5433e118f61b" }
+orchestrator-ws-client = { git = "https://github.com/cornellev/orchestrator", rev = "c6fe352fd5cdee3b8f70a5695b1b5433e118f61b" }
+tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
+ctrlc = "3"
+ureq = { version = "3.5", features = ["json"] }
+
+[dev-dependencies]
+

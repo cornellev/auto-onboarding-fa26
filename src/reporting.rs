@@ -1,0 +1,216 @@
+use crate::{grid::Grid, runner::Update, types::*, Result};
+use serde::Serialize;
+use std::{
+    fs::{self, File},
+    io::{BufWriter, Write},
+    path::{Path as FilePath, PathBuf},
+};
+
+#[derive(Debug, Serialize)]
+pub struct Summary {
+    pub status: String,
+    pub goal_reached: bool,
+    pub elapsed_s: f64,
+    pub final_distance_m: Option<f64>,
+    pub traveled_m: f64,
+    pub mean_tracking_error_m: Option<f64>,
+    pub collisions: Option<u64>,
+    pub simulator_passed: Option<bool>,
+    pub termination_reason: Option<String>,
+}
+
+impl Default for Summary {
+    fn default() -> Self {
+        Self {
+            status: "not started".into(),
+            goal_reached: false,
+            elapsed_s: 0.0,
+            final_distance_m: None,
+            traveled_m: 0.0,
+            mean_tracking_error_m: None,
+            collisions: None,
+            simulator_passed: None,
+            termination_reason: None,
+        }
+    }
+}
+
+pub struct Reporter {
+    pub directory: PathBuf,
+    csv: BufWriter<File>,
+    pub trajectory: Vec<Point2>,
+    tracking_sum: f64,
+    tracking_count: usize,
+    pub summary: Summary,
+}
+
+impl Reporter {
+    pub fn new(directory: impl AsRef<FilePath>) -> Result<Self> {
+        let directory = directory.as_ref().to_path_buf();
+        fs::create_dir_all(&directory)?;
+        let mut csv = BufWriter::new(File::create(directory.join("updates.csv"))?);
+        writeln!(csv,"time_s,x_m,y_m,yaw_rad,speed_mps,command_speed_mps,command_steering_rad,tracking_error_m,compute_us,saturated")?;
+        Ok(Self {
+            directory,
+            csv,
+            trajectory: vec![],
+            tracking_sum: 0.0,
+            tracking_count: 0,
+            summary: Summary::default(),
+        })
+    }
+
+    pub fn record(
+        &mut self,
+        observation: &Observation,
+        update: &Update,
+        goal: Point2,
+        compute_us: u128,
+    ) -> Result<()> {
+        let point = observation.state.pose.position;
+        if let Some(last) = self.trajectory.last() {
+            self.summary.traveled_m += last.distance(point);
+        }
+        self.trajectory.push(point);
+        let tracking = tracking_error(point, &update.path);
+        if let Some(error) = tracking {
+            self.tracking_sum += error;
+            self.tracking_count += 1;
+        }
+        self.summary.status = update.status.into();
+        self.summary.goal_reached = update.status == "goal reached";
+        self.summary.elapsed_s = observation.time_ns as f64 / 1e9;
+        self.summary.final_distance_m = Some(point.distance(goal));
+        self.summary.mean_tracking_error_m =
+            (self.tracking_count > 0).then(|| self.tracking_sum / self.tracking_count as f64);
+        writeln!(
+            self.csv,
+            "{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{}",
+            self.summary.elapsed_s,
+            point.x,
+            point.y,
+            observation.state.pose.yaw_rad,
+            observation.state.speed_mps,
+            update.command.speed_mps,
+            update.command.steering_rad,
+            tracking.map(|v| v.to_string()).unwrap_or_default(),
+            compute_us,
+            update.saturated
+        )?;
+        self.csv.flush()?;
+        Ok(())
+    }
+
+    pub fn finish(&mut self, map: &Grid, path: &[Point2], goal: Point2) -> Result<()> {
+        self.csv.flush()?;
+        fs::write(
+            self.directory.join("summary.json"),
+            serde_json::to_string_pretty(&self.summary)? + "\n",
+        )?;
+        write_svg(
+            &self.directory.join("view.svg"),
+            map,
+            path,
+            &self.trajectory,
+            goal,
+        )?;
+        println!(
+            "{}; goal distance: {}; collisions: {}\nResults: {}",
+            self.summary.status,
+            self.summary
+                .final_distance_m
+                .map(|d| format!("{d:.2} m"))
+                .unwrap_or_else(|| "unavailable".into()),
+            self.summary
+                .collisions
+                .map(|n| n.to_string())
+                .unwrap_or_else(|| "unavailable; inspect simulator results/Replay".into()),
+            self.directory.display()
+        );
+        Ok(())
+    }
+}
+
+pub fn tracking_error(point: Point2, path: &[Point2]) -> Option<f64> {
+    if path.is_empty() {
+        return None;
+    }
+    if path.len() == 1 {
+        return Some(point.distance(path[0]));
+    }
+    path.windows(2)
+        .map(|p| {
+            let (dx, dy) = (p[1].x - p[0].x, p[1].y - p[0].y);
+            let length = dx * dx + dy * dy;
+            let t = if length > 0.0 {
+                (((point.x - p[0].x) * dx + (point.y - p[0].y) * dy) / length).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            point.distance(Point2 {
+                x: p[0].x + t * dx,
+                y: p[0].y + t * dy,
+            })
+        })
+        .reduce(f64::min)
+}
+
+pub fn write_svg(
+    file: &FilePath,
+    map: &Grid,
+    path: &[Point2],
+    trajectory: &[Point2],
+    goal: Point2,
+) -> Result<()> {
+    map.validate()?;
+    let mut out = BufWriter::new(File::create(file)?);
+    let w = map.width as f64 * map.resolution_m;
+    let h = map.height as f64 * map.resolution_m;
+    let scale = (840.0 / w).min(500.0 / h);
+    let pixel = |p: Point2| {
+        (
+            (p.x - map.origin.x) * scale + 30.0,
+            540.0 - (p.y - map.origin.y) * scale,
+        )
+    };
+    writeln!(out,"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 600\" role=\"img\" aria-labelledby=\"title desc\"><title id=\"title\">Onboarding map and trajectory</title><desc id=\"desc\">Black: occupied cells. Blue: requested path. Orange: actual trajectory. Green: goal. Coordinates are meters in the world frame.</desc><rect width=\"900\" height=\"600\" fill=\"#fafafa\"/><text x=\"30\" y=\"24\" font-family=\"sans-serif\" font-size=\"16\">World map · x right, y up · meters</text>")?;
+    writeln!(
+        out,
+        "<rect x=\"30\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"white\" stroke=\"#888\"/>",
+        540.0 - h * scale,
+        w * scale,
+        h * scale
+    )?;
+    for row in 0..map.height {
+        for col in 0..map.width {
+            if map.blocked(col, row) {
+                let p = map.center(col, row).unwrap();
+                let (x, y) = pixel(p);
+                let size = map.resolution_m * scale;
+                writeln!(
+                    out,
+                    "<rect x=\"{}\" y=\"{}\" width=\"{size}\" height=\"{size}\" fill=\"#242424\"/>",
+                    x - size / 2.0,
+                    y - size / 2.0
+                )?;
+            }
+        }
+    }
+    for (points, color) in [(path, "#1757b8"), (trajectory, "#c24f00")] {
+        let points = points
+            .iter()
+            .map(|p| {
+                let (x, y) = pixel(*p);
+                format!("{x:.2},{y:.2}")
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+        writeln!(
+            out,
+            "<polyline points=\"{points}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"3\"/>"
+        )?;
+    }
+    let (x, y) = pixel(goal);
+    writeln!(out,"<circle cx=\"{x}\" cy=\"{y}\" r=\"7\" fill=\"#147445\"/><text x=\"30\" y=\"575\" font-family=\"sans-serif\" font-size=\"14\">■ Occupied   Blue: path   Orange: actual   Green: goal</text></svg>")?;
+    Ok(())
+}
