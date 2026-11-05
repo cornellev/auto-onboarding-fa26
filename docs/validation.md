@@ -1,13 +1,65 @@
-# Starter validation
+# Migration validation
 
-Validated locally on macOS on November 4, 2026, against the simulator and orchestrator revisions pinned in `Cargo.toml`.
+Validated locally on macOS on November 5, 2026. Service revisions and dependency
+pins are recorded in `config/services.json` and Cargo.lock.
 
-- `cargo fmt --check`, Clippy with warnings denied, and the default infrastructure/fixture suite.
-- Generated all three courses using ev-sim's validator/exporter and installed their full authoring dependencies through `setup`.
-- Live browser smoke test: stationary observation, bounded driving, stop, then a fresh stationary run.
-- Live watchdog test: move under candidate control, stop sending commands while continuing to receive observations, and verify the simulator stops the car independently.
-- Detour observation: received 19 LiDAR obstacle points per scan while the vehicle remained stationary.
+## Passed
 
-The normal test suite deliberately ignores student acceptance and live-browser tests. The two infrastructure live tests were explicitly enabled during this validation. No completed student algorithms were used.
+- Rust formatting, Clippy with warnings denied, and default infrastructure/fixture
+  tests. Student wiring, algorithm, and browser acceptance checks remain ignored by
+  default. No completed mapper, planner, or controller was supplied.
+- Reproducible generated Rust bindings, descriptor bytes, and profile fingerprint.
+- API authorization regression: orchestrator tokens are never forwarded to simulator
+  storage requests. The loopback check is included in transport CI.
+- 57 orchestrator tests, including legacy binary compatibility, generic descriptors,
+  unrelated schemas, exact 64-bit values, stale plans, invalid commands, bounded
+  queues, no-path invalidation, and the bounded drive-test cutoff.
+- Generic round trip: JavaScript Client -> orchestrator -> binary Protobuf over a
+  real Zenoh 1.10.2 router -> Rust, followed by a Rust response back to JavaScript.
+- The self-contained CI transport script, using fresh loopback services and three
+  distinct node processes. Perception publishes NOT_READY before its algorithm is
+  implemented; planning/controls report their unfinished wiring and stay stopped.
+- Real browser scan/pose reception while stationary; bounded one-second driving;
+  stop followed by a new stationary run. The detour course produced 19 LiDAR points
+  per scan while stationary.
+- Live command-loss stopping while observation reception continued, using the
+  separately enabled integration test.
+- Focused simulator transport, installer, sensor protocol, and browser-safe hash
+  tests. Lint completed with zero errors and three existing React-hook warnings.
+- A fresh native macOS combined installation from local committed source revisions,
+  including both services, pinned dependencies, checksum-verified router, and orch
+  command. Test installation used its own directories and command PATH.
+- Browser-safe catalog/calibration hashes match the supplied course's previous
+  hashes. The two Node-only hash imports prevented fresh browser bundling and were
+  replaced with the already-used browser-safe SHA-256 library.
 
-Windows/Linux native execution and physical Pi/RP2040 integration were not exercised locally. CI is configured for the three desktop platforms. Physical validation requires the maintainer handoff in `hardware.md`; the supplied dimensions are synthetic training geometry.
+## Baseline simulator failures
+
+The full simulator suite was run. These five failures were reproduced against a
+clean archive of its untouched base revision:
+
+- Headless characterization fixture steering/trajectory mismatch.
+- Plan-view control arcs/localization snapshot.
+- Plugin range-image devices after parent updates.
+- State-sensor mounts after parent updates.
+- LiDAR hierarchy row identity.
+
+Their fixtures and expectations were preserved. One additional piped-installer
+fixture failure under the full parallel run was corrected by ending its test input
+at the intentional exit point; focused installer checks pass. This does not change
+installer behavior or weaken student acceptance criteria.
+
+## Remaining release gates
+
+- GitHub publication of the two implementation branches requires explicit approval.
+  Until then, remote installation and CI cannot fetch the new service revisions.
+- Native Windows/Linux installation and browser execution have not been exercised
+  locally. Cross-platform Rust and transport jobs are configured for all three OSes.
+- Empty/detour autonomous goal arrival requires completed student algorithms.
+- Pi 5/RP2040 integration, measured geometry, localization, braking, and physical
+  emergency stopping require the separate maintainer hardware handoff.
+- Visual Protobuf field wiring and driver/firmware implementation are deferred.
+
+SFLog/Replay remains the source for applied simulator commands and collision detail.
+Collision counts remain unavailable when that evidence is not exposed; reports do
+not fabricate a zero count or treat a manual run stop as simulator success.

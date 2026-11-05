@@ -2,7 +2,7 @@ use cev_onboarding::{
     grid::Grid,
     hardware::validate_hardware_spec,
     reporting::tracking_error,
-    runner::{validate_path, Course, Mode, Runner},
+    runner::{validate_path, Course},
     types::*,
 };
 
@@ -123,26 +123,19 @@ fn stop_defaults_nonfinite_rejection_and_command_limits() {
 }
 
 #[test]
-fn runner_handles_incomplete_algorithms_goals_timeouts_and_reset() {
-    for mode in [Mode::Observe, Mode::Autonomous, Mode::Controls] {
-        let mut runner = Runner::new(course(), mode).unwrap();
-        let output = runner.update(&observation(100_000_000)).unwrap();
-        assert_eq!(output.command, DriveCommand::STOP);
-        assert!(!output.finished);
-        assert!(runner.update(&observation(100_000_000)).is_err());
-        assert!(Runner::new(course(), mode)
-            .unwrap()
-            .update(&observation(100_000_000))
-            .is_ok());
-    }
-    let mut runner = Runner::new(course(), Mode::Autonomous).unwrap();
-    let mut obs = observation(100);
-    obs.state.pose.position = runner.course.goal;
-    assert_eq!(runner.update(&obs).unwrap().status, "goal reached");
-    let mut runner = Runner::new(course(), Mode::Autonomous).unwrap();
+fn unfinished_algorithms_are_safe_and_independent() {
+    use cev_onboarding::student::{
+        controls::Controller, perception::Perception, planning::Planner,
+    };
+    let course = course();
+    let obs = observation(100_000_000);
+    assert!(Perception::new(course.grid.clone()).update(&obs).is_none());
+    assert!(Planner::default()
+        .plan(&course.grid, &obs.state, course.goal)
+        .is_none());
     assert_eq!(
-        runner.update(&observation(91_000_000_000)).unwrap().status,
-        "timeout"
+        Controller::new(course.vehicle).command(&obs.state, &[], 0.1),
+        DriveCommand::STOP
     );
 }
 

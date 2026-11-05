@@ -36,3 +36,22 @@ Use a short, flat, static, low-speed course with one clearly visible obstacle, g
 Require navigation and obstacle avoidance on December 5. Confirm arrival against physical course markings; successful odometry alone is insufficient. Save a video/log and explain drift or tracking limitations. If this support layer is not ready, that is a maintainer integration blocker, not an algorithm failure by freshmen.
 
 Device-specific drivers and the RP2040 wire protocol are intentionally outside this repository until the team supplies the actual hardware interface.
+
+## Zenoh / Protobuf handoff
+
+The Pi support layer publishes `StateUpdate` and `LidarUpdate` and consumes
+`CommandUpdate` under the same run-scoped keys described in `routing.md`. It provides
+RunInfo with a measured, hardware-calibrated VehicleSpec and a surveyed goal/frame.
+It must validate run identity, source age, deadlines, finite values, and actuator
+limits independently. Desktop nodes do not require Pi drivers.
+
+Encoder/IMU odometry and capture alignment remain maintainer responsibilities.
+Demonstrate stale-command and process-loss stopping, braking distance, localization
+error, and physical emergency stopping before student integration. The RP2040
+watchdog remains independent of the Pi and Zenoh connection. Require simulation
+evidence before the low-speed physical obstacle detour; verify arrival against
+course markings on December 5 rather than odometry alone.
+
+Observation timestamps are run-relative integer nanoseconds from a monotonic clock.
+The support layer establishes zero when arming and preserves capture-time alignment
+across sensor and odometry sources. Wall time is only for transport liveness.

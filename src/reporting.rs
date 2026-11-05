@@ -38,7 +38,9 @@ impl Default for Summary {
 pub struct Reporter {
     pub directory: PathBuf,
     csv: BufWriter<File>,
+    events: BufWriter<File>,
     pub trajectory: Vec<Point2>,
+    pub source_time_ns: Option<u64>,
     tracking_sum: f64,
     tracking_count: usize,
     pub summary: Summary,
@@ -49,15 +51,27 @@ impl Reporter {
         let directory = directory.as_ref().to_path_buf();
         fs::create_dir_all(&directory)?;
         let mut csv = BufWriter::new(File::create(directory.join("updates.csv"))?);
-        writeln!(csv,"time_s,x_m,y_m,yaw_rad,speed_mps,command_speed_mps,command_steering_rad,tracking_error_m,compute_us,saturated")?;
+        writeln!(csv,"time_s,x_m,y_m,yaw_rad,speed_mps,command_speed_mps,command_steering_rad,tracking_error_m,compute_us,saturated,source_age_ns")?;
         Ok(Self {
+            events: BufWriter::new(File::create(directory.join("node-events.jsonl"))?),
             directory,
             csv,
             trajectory: vec![],
+            source_time_ns: None,
             tracking_sum: 0.0,
             tracking_count: 0,
             summary: Summary::default(),
         })
+    }
+
+    pub fn event(&mut self, node: &str, detail: &str, time_ns: u64, pid: u32) -> Result<()> {
+        writeln!(
+            self.events,
+            "{}",
+            serde_json::json!({"node":node,"pid":pid,"detail":detail,"time_ns":time_ns})
+        )?;
+        self.events.flush()?;
+        Ok(())
     }
 
     pub fn record(
@@ -85,7 +99,7 @@ impl Reporter {
             (self.tracking_count > 0).then(|| self.tracking_sum / self.tracking_count as f64);
         writeln!(
             self.csv,
-            "{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{}",
+            "{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{}",
             self.summary.elapsed_s,
             point.x,
             point.y,
@@ -95,7 +109,11 @@ impl Reporter {
             update.command.steering_rad,
             tracking.map(|v| v.to_string()).unwrap_or_default(),
             compute_us,
-            update.saturated
+            update.saturated,
+            self.source_time_ns
+                .and_then(|t| observation.time_ns.checked_sub(t))
+                .map(|n| n.to_string())
+                .unwrap_or_default()
         )?;
         self.csv.flush()?;
         Ok(())

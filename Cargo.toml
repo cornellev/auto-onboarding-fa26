@@ -9,11 +9,16 @@ publish = false
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 simcontrol = { git = "https://github.com/cornellev/ev-sim", rev = "6c095b97ff1b5eed90777ccd15a53726b2ce86e2" }
-orchestrator-protocol = { git = "https://github.com/cornellev/orchestrator", rev = "c6fe352fd5cdee3b8f70a5695b1b5433e118f61b" }
-orchestrator-ws-client = { git = "https://github.com/cornellev/orchestrator", rev = "c6fe352fd5cdee3b8f70a5695b1b5433e118f61b" }
-tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
 ctrlc = "3"
 ureq = { version = "3.5", features = ["json"] }
+base64 = "0.22"
+prost = "=0.14.4"
+sha2 = "0.10"
+# Newer uuid releases require Rust 1.89; keep the starter compatible with 1.88.
+uuid = { version = "=1.26.1", features = ["v4"] }
+zenoh = { version = "=1.10.2", default-features = false, features = ["transport_tcp"] }
 
 [dev-dependencies]
+prost-build = "=0.14.4"
+protoc-bin-vendored = "3"
 

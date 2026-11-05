@@ -35,3 +35,31 @@ CSV uses seconds, meters, and radians. Its timestamp is simulation time. The SVG
 The live browser loop receives asynchronous transport messages. Exact pose and simulation timestamps come from the live `/tf` stream in this simulator revision; speed is estimated from successive poses. Identical seeds and courses make useful repeatable experiments, but browser/network timing can change exact trajectories. A reset starts a new episode; restart the Rust process so maps, search state, and controller state reset together.
 
 If Ctrl-C cannot complete because a service disappeared, the independent watchdog is the last stop mechanism. Check the simulator before restarting. A process exit does not itself prove a physical minicar stopped.
+
+## Distributed nodes
+
+Read `node-events.jsonl` first. An unchanged starter reports perception's unfinished
+mapper and planning/controls wiring separately. Each node is an independent process;
+a child crash or a changed PID stops the graph. The launcher checks routing/browser
+identity every 250 ms; losing it also stops motion at the orchestrator boundary.
+
+- Missing RunInfo: verify router endpoint, run ID, and the active launch.
+- Schema mismatch: regenerate artifacts together and rerun setup while stopped.
+- No matched observation: check capture timestamps and separate state/LiDAR channels.
+- No path after an algorithm change: run the independent planning fixture and check
+  endpoints/clearance, including every segment between waypoints.
+- Stale command: inspect its original source timestamp. Fresh publication does not
+  refresh an old map or plan.
+- Disconnected browser: refresh after restarting orchestrator, then start a new run.
+- Multiple publishers: close extra simulator pages and terminate duplicate nodes.
+  Immediately after a refresh, wait for the old page heartbeat to expire if it is
+  still listed as connected; the runner deliberately refuses ambiguous publishers.
+- Port in use: leave unrelated services alone and configure the alternate endpoints.
+
+Only generic Protobuf subscribers receive the new WebSocket text messages. Existing
+binary `.msg` clients continue using their previous topic catalog and protocol.
+The checked-in routing profile is data; changing it does not supply sensor values
+or write a planning algorithm.
+
+CSV command columns describe received, limited requests. Actual vehicle speed is
+recorded separately; use simulator Replay for commands applied by the plant.

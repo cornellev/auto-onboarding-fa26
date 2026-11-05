@@ -101,3 +101,49 @@ Run each component independently before integrating. Then navigate empty and det
 For the demonstration, explain your data flow, algorithm choices, test evidence, one failure, and one improvement. Write short notes in your PRs or a `RESULTS.md` you create. A successful simulation does not validate physical calibration or localization.
 
 Schedule: setup November 7; perception November 12/14; planning checkpoint November 19; optional work November 21; no required Thanksgiving work; controls/integration December 3; demonstration December 5; submission December 6, 2026.
+
+## Wiring
+
+Perception's node is the worked transport example. It explicitly declares bounded
+Zenoh subscribers and a Protobuf publisher. Keep its algorithm unfinished until you
+complete the perception challenge.
+
+Implement transport in `src/nodes/planning.rs` and `src/nodes/controls.rs`. The
+provided `Context` opens the configured session and loads the immutable RunInfo.
+Use its `transport.session`, `transport.key(...)`, and generated `protocol::pb`
+types. `prost::Message` encodes/decodes binary Protobuf. `transport::receive` is a
+bounded-subscription decoding helper. `Context::poll` handles shutdown and run loss.
+
+Planning owns a map subscriber, path publisher, and persistent `Planner`. Every map
+update needs a result, including unavailable/no-path updates that clear older paths.
+`nodes::planned_update` invokes the algorithm and validates endpoints, clearance,
+and segments before constructing a result with source metadata intact.
+
+Controls owns state/path subscribers, a command publisher, and persistent Controller.
+Keep the latest path, including unavailable results. Run once per fresh state at
+10 Hz; compute `dt_s` from capture time. `nodes::controlled_update` creates a safe
+command and retains the path's source deadline. Stop for missing or expired paths.
+Never stamp an old path as though it came from a new observation. Publish node
+status with `Context::status` so mentors can distinguish wiring from algorithms.
+
+```sh
+cargo run -- fixture-publish planning --run planning-practice
+cargo run -- node planning --run planning-practice
+cargo test --test wiring -- --ignored
+```
+
+The fixture publisher has no browser/actuator binding. Wiring tests can pass before
+algorithms: planning must publish NO_PATH and controls must publish STOP. Once an
+algorithm is implemented, valid READY paths and bounded finite commands are accepted.
+The separately runnable algorithm tests continue to require actual completion.
+
+<details>
+<summary>Wiring hints</summary>
+
+Read perception's calls to `declare_subscriber`, `declare_publisher`, and `put`.
+Use ring channels so slow consumers do not accumulate old updates. Keep algorithm
+objects outside the receive loop. Validate run/frame headers. Keep all existing
+loop/error/shutdown checks and use provided conversion helpers for plain structs.
+Publish unavailable results as messages so downstream nodes discard previous output.
+
+</details>

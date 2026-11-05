@@ -1,132 +1,194 @@
 # Getting started
 
-Budget a first work session for setup. Later work should be mostly in three Rust files.
+Budget the first session for setup. Algorithm work stays in three student modules;
+planning and controls also have short transport loops to wire.
 
-## Install tools
+## Tools
 
-- Rust **1.88 or newer** with Cargo, rustfmt, and Clippy. Use the official Rust installer at <https://rustup.rs/>. On Windows, select the MSVC toolchain and install the Visual Studio C++ build tools if prompted.
-- Git and curl. The simulator installer prepares Node.js **22.22.2**, the orchestrator's Python environment, and service dependencies.
-- A current browser with WebGL2. No ROS, Zenoh, Docker, GPU toolkit, or Linux VM is required for these courses.
+Install Rust 1.88 or newer with rustfmt/Clippy, Git, and a current desktop browser
+with WebGL2. Windows uses the MSVC Rust toolchain and Visual Studio C++ build tools.
+The combined simulator installer prepares Node 22.22.2, Python, orchestrator,
+Zenoh/Protobuf dependencies, and the pinned Zenoh 1.10.2 router. No ROS, Docker,
+Protobuf compiler, or Linux VM is needed for the exercises.
 
-The Rust client dependencies are pinned to the tested simulator/orchestrator revisions below. The first Cargo build needs internet access; later builds can use the cache. Commit `Cargo.lock` when changing dependencies.
+## Install simulator and orchestrator together
 
-## Install the simulator and orchestrator together
+Use the simulator and orchestrator revisions recorded in `config/services.json`.
+On macOS/Linux, run the simulator's combined installer from its desired parent directory:
 
-On macOS/Linux, run the simulator's combined installer from the directory where you want its `ev-sim` checkout:
+The service revisions are committed locally on `cev-onboarding-protobuf` branches.
+Publication is awaiting explicit approval; the GitHub installation command becomes
+usable after those branches are published. For local review, use the service checkouts
+described in the [local service handoff](service-changes.md). Existing modified installations are refused when selecting
+an exact revision; use a clean directory. Open new terminals after installation.
+There is no separate orchestrator clone, pip, or virtualenv activation step on this path.
+
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/cornellev/ev-sim/main/install.sh \
-  | bash -s -- --ref 6c095b97ff1b5eed90777ccd15a53726b2ce86e2 \
-    --orchestrator --orchestrator-dir "$HOME/cev/orchestrator"
+curl -fsSL https://raw.githubusercontent.com/cornellev/ev-sim/4a182c7921448d981d0b5d4543268e348ca251af/install.sh \
+  | bash -s -- --ref 4a182c7921448d981d0b5d4543268e348ca251af --onboarding \
+    --orchestrator-ref 823554b4c62a26d73554ae650980d4c65ce562db --orchestrator-dir "$HOME/cev/orchestrator"
 ```
-
-This installs ev-sim in `./ev-sim`, installs the orchestrator in `~/cev/orchestrator`, creates its virtual environment, installs both services' dependencies, and installs the `orch` command. Accept the Node.js setup prompt if needed. Marketplace features are not needed for onboarding. `--orchestrator` explicitly includes orch even when the installer has no interactive terminal.
-
-The installer's `--ref` selects the simulator revision only. Keep the installed orchestrator at the tested revision too:
-
-```sh
-git -C "$HOME/cev/orchestrator" checkout c6fe352fd5cdee3b8f70a5695b1b5433e118f61b
-```
-
-Open new terminals after installation so `orch` and any installed Node.js version are on PATH. There is no separate orchestrator clone, pip installation, or virtualenv activation step on this path.
 
 <details>
 <summary>Native Windows setup</summary>
 
-The current Bash installer assumes Unix `.venv/bin/python` paths, so Git Bash alone does not provide a native Windows installation. To keep the services native, install Node.js 22.22.2 and Python 3.10–3.13, then use PowerShell:
+Install Node 22.22.2 and Python 3.12, then use PowerShell. Use the revisions from
+`config/services.json` in the two checkout commands:
 
-```sh
+```powershell
 git clone https://github.com/cornellev/ev-sim.git
-git -C ev-sim checkout 6c095b97ff1b5eed90777ccd15a53726b2ce86e2
+git -C ev-sim checkout 4a182c7921448d981d0b5d4543268e348ca251af
 cd ev-sim
 npm ci
 cd ..
 git clone https://github.com/cornellev/orchestrator.git
-git -C orchestrator checkout c6fe352fd5cdee3b8f70a5695b1b5433e118f61b
+git -C orchestrator checkout 823554b4c62a26d73554ae650980d4c65ce562db
 cd orchestrator
-python -m venv .venv
-./.venv/Scripts/python.exe -m pip install -r requirements.txt
+py -3.12 -m venv .venv
+./.venv/Scripts/python.exe -m pip install -r requirements.txt -r requirements-protobuf.txt
+./.venv/Scripts/python.exe scripts/install_zenoh.py
 ```
 
-Start the orchestrator there with `./.venv/Scripts/python.exe main.py` instead of `orch`; start the simulator in its checkout with `npm run dev`. No virtualenv activation is required.
+The router installer prints its executable location. Use that full path if it is
+not on PATH. Start orchestrator with `./.venv/Scripts/python.exe main.py` followed
+by the options below. No virtualenv activation is required.
 
 </details>
 
-## Start the two existing services
+## Start services
 
-**Terminal 1: orchestrator**
+Use separate terminals. From the onboarding checkout, start the router:
 
 ```sh
-orch
+zenohd -c config/zenoh-router.json5
 ```
 
-Leave the default standalone mode: `ROS_ENABLED` and `ZENOH_ENABLED` are false. It listens locally on ports **8080** and **8090**.
-
-**Terminal 2: simulator** (from the installation's parent directory)
+Start orchestrator:
 
 ```sh
-cd ev-sim
+orch --zenoh-profile cev-onboarding-v1 --zenoh-connect tcp/127.0.0.1:7447
+```
+
+In the installed simulator checkout:
+
+```sh
 npm run dev
 ```
 
-Open <http://localhost:3000>. Keep exactly one simulator page and one onboarding controller active. Do not run another autonomy stack on the same orchestrator. If you started the simulator before the orchestrator, refresh the simulator page so it connects and syncs message definitions.
+Open http://localhost:3000 in one desktop browser page. Keep the run stopped.
+If orchestrator restarted after the browser connected, refresh the page.
+Avoid another controller or simulator publisher on this orchestrator.
 
-Leave the page on Simulation with its run stopped. Save or discard other workspace edits. The onboarding `setup` command below installs the three course bundles' environments, vehicle, scenarios, and manifests through the existing storage API. The browser's bare run-bundle import does not restore the full scenario/vehicle closure, so use this command for initial setup.
+## Observe the starter
 
-Setup creates only missing resources, then verifies the resolved course hashes. It never overwrites existing resources. The saved course IDs are `onboarding-empty`, `onboarding-detour`, and `onboarding-blocked`.
-
-## Run your checkout
-
-**Terminal 3: onboarding repository**
+Back in the onboarding checkout:
 
 ```sh
 cargo test --locked
 cargo run -- setup
-cargo run -- observe
+cargo run -- observe --duration 5
+cargo run -- observe --scenario detour --duration 5
+cargo run -- drive-test
 ```
 
-You should see a stationary vehicle, advancing simulation timestamps, and received point counts. The empty course can legitimately produce zero obstacle returns. `cargo run -- observe --scenario detour` shows returns from the obstacle. Ctrl-C stops the run; `--duration 5` runs a short check automatically.
+`setup` registers the schema/profile and installs the complete course resources
+through the existing storage API. It does not overwrite edited course resources.
+Run it again after restarting orchestrator because registrations are process-local.
+The raw simulator bundle importer does not restore the complete scenario/vehicle closure.
+
+Observation shows advancing timestamps and sensor counts while the car stays
+stopped. Empty scans are normal on the empty course. Detour provides obstacle hits.
+`drive-test` applies at most 0.1 m/s and 0.1 rad for one simulated second, then stops.
+
+Each run gets new simulator topic names, Zenoh keys, and fresh algorithm state.
+Ctrl-C stops/finalizes a run. Reconnection never resumes an old autonomy graph.
+
+## Work independently
+
+Offline algorithm fixtures need only Rust:
 
 ```sh
 cargo run -- perception
 cargo run -- planning --scenario detour
-cargo run -- controls --path fixtures/path-curve.json
-cargo run -- drive-test
 ```
 
-`drive-test` is an isolated, one-second simulation command test. It is not an autonomous controller. Controls fixtures only run on the empty course. Use autonomous mode for obstacle avoidance.
+Transport fixtures need only the local router. They have no actuator connection:
 
-Unfinished fixture modes still write a view and explain which function needs work. A live controls/autonomous run that never reaches the goal exits unsuccessfully; a blocked goal is expected to remain stopped. Stop that diagnostic run with Ctrl-C rather than waiting for its 90-second bound.
+```sh
+cargo run -- fixture-publish planning --run planning-practice
+# In another terminal:
+cargo run -- node planning --run planning-practice
+```
 
-The latest result directory is printed by every completed command. Open its `view.svg` in a browser, inspect `summary.json`, or graph `updates.csv`. The simulator records its own run for Analysis/Replay when logging is available.
+Use `perception` or `controls` instead of `planning` to exercise those inputs.
+A fixture runs for 60 seconds unless `--duration` is supplied.
 
-## First contribution
+For live controls and integration:
 
-1. Make a branch: `git switch -c your-name/perception`.
-2. Change one student module. Keep the provided function signature.
-3. Run that fixture and its acceptance test. Explain a result, including failures.
-4. Run `cargo fmt`, `cargo clippy --locked --all-targets -- -D warnings`, and `cargo test --locked`.
-5. Commit the change and open a GitHub pull request with what changed, why, and the test evidence. Ask another freshman or mentor to review it.
+```sh
+cargo run -- controls --path fixtures/path-curve.json
+cargo run -- autonomous --scenario detour
+```
 
-Use `cargo test --test perception -- --ignored` to enable perception's acceptance checks. The normal test suite must remain green before any algorithms are written. Do not delete or weaken acceptance checks to make incomplete work appear finished.
+Autonomous launches three independent processes. Unfinished planning/controls wiring
+reports what remains and the car stays stopped. A diagnostic run without goal arrival
+exits unsuccessfully. Use a short `--duration 5` or Ctrl-C while developing.
 
-## Maintainer course updates
+To start nodes manually, launch `autonomous --manual-nodes`. It prints the run ID
+and waits, paused, for all three nodes:
 
-The checked-in bundles are generated with ev-sim's own storage, normalization, validation, and export code. They contain no custom simulator implementation.
+```sh
+cargo run -- node perception --run RUN_ID
+cargo run -- node planning --run RUN_ID
+cargo run -- node controls --run RUN_ID
+```
+
+## Checks and contribution
+
+```sh
+cargo fmt --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+cargo test --test wiring -- --ignored
+cargo test --test planning -- --ignored
+```
+
+Wiring and algorithm acceptance checks are intentionally ignored until students
+implement them. Keep their expectations intact. The provided bootstrap check can
+be run independently with a live router:
+
+```sh
+cargo test --test wiring three_processes -- --ignored
+```
+
+Create a branch, make one focused change, run its fixture/checks, and open a pull
+request explaining behavior and evidence. Read `node-events.jsonl`, `updates.csv`,
+`summary.json`, and `view.svg` in the printed result directory. Use the browser's
+Analysis/Replay for simulator detail.
+
+## Maintainer changes
+
+Regenerate Rust bindings, descriptor bytes, and profile fingerprint together:
+
+```sh
+cargo run --example generate_schema
+cargo fmt
+```
+
+Regenerate courses with the pinned simulator:
 
 ```sh
 node --experimental-default-type=module scripts/generate-courses.mjs /path/to/ev-sim
 ```
 
-Use the pinned simulator revision. Commit updated bundles and matching JSON sidecars together. Run `setup` against a fresh simulator data directory, then rerun the live smoke test. The adapter verifies manifest/dependency identities, then matches the prepared run hash to the just-validated run. Import timestamp changes alone are allowed; altered geometry or watchdog settings are rejected.
+Commit bundles and matching sidecars together. Course verification allows import
+timestamp changes but rejects semantic dependency changes. Each temporary scoped
+manifest is resolved before launch and checked against the prepared browser hash.
+Keep the legacy external scenario controller disabled; candidate commands must
+retain their stamps, sequence checks, and deadlines through ControlRuntime.
 
-The legacy scenario `external-ros` controller loses command stamps and submits reference commands in this revision. These courses leave that route controller disabled and unmatched. Candidate `/controls/command` packets go directly to `ControlRuntime`, retaining deadlines, sequence checks, and the watchdog. Do not wire that topic into the scenario controller.
-
-Live checks need the services and one open simulator page:
-
-```sh
-cargo test --test integration browser_observation_drive_stop_and_fresh_run -- --ignored --test-threads=1
-cargo test --test integration candidate_watchdog_stops_when_commands_stop -- --ignored --test-threads=1
-```
-
-The other ignored integration checks require completed student algorithms. CI does not launch a browser or real hardware.
+Alternate endpoints for isolated testing: `CEV_ORCHESTRATOR_API`,
+`CEV_ZENOH_ENDPOINT`, and CLI `--server`. The simulator accepts
+`NEXT_PUBLIC_ORCHESTRATOR_API` / `NEXT_PUBLIC_ORCHESTRATOR_WS` at build/start time.
+`CEV_API_TOKEN` supplies an existing orchestrator API bearer token.
