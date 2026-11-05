@@ -34,7 +34,7 @@ its `orch` command has not been installed. Start `npm run dev` from the simulato
 checkout. The new simulator defaults to the existing ports; alternate endpoint
 environment variables support independent testing without stopping other services.
 
-The combined installer was tested from clean local clones with the exact service
-revisions, Node 22.22.2, isolated command paths, and no changes to shell startup files.
+The combined installer was tested from clean local clones with Node 22.22.2,
+isolated command paths, and no changes to shell startup files.
 Both `orch` and `zenohd` honor `ORCHESTRATOR_BIN_DIR`. The final simulator commit only
 improves the printed startup instructions after that successful installation.

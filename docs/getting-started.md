@@ -23,7 +23,7 @@ See the [service handoff](service-changes.md) for the local checkout locations.
 EV_SIM_REPO="$PWD/services/sim" bash services/sim/install.sh \
   --dir "$HOME/cev/ev-sim-onboarding" \
   --ref 4a182c7921448d981d0b5d4543268e348ca251af --onboarding \
-  --orchestrator-ref 823554b4c62a26d73554ae650980d4c65ce562db \
+  --orchestrator-ref 2128e43691bd205ef56c5266f69505f809a8178e \
   --orchestrator-dir "$HOME/cev/orchestrator"
 ```
 
@@ -46,7 +46,7 @@ cd ev-sim
 npm ci
 cd ..
 git clone https://github.com/cornellev/orchestrator.git
-git -C orchestrator checkout 823554b4c62a26d73554ae650980d4c65ce562db
+git -C orchestrator checkout 2128e43691bd205ef56c5266f69505f809a8178e
 cd orchestrator
 py -3.12 -m venv .venv
 ./.venv/Scripts/python.exe -m pip install -r requirements.txt -r requirements-protobuf.txt

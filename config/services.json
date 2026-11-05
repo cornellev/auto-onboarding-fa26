@@ -2,7 +2,7 @@
   "sim_repository": "https://github.com/cornellev/ev-sim.git",
   "sim_ref": "4a182c7921448d981d0b5d4543268e348ca251af",
   "orchestrator_repository": "https://github.com/cornellev/orchestrator.git",
-  "orchestrator_ref": "823554b4c62a26d73554ae650980d4c65ce562db",
+  "orchestrator_ref": "2128e43691bd205ef56c5266f69505f809a8178e",
   "simcontrol_ref": "6c095b97ff1b5eed90777ccd15a53726b2ce86e2",
   "zenoh_version": "1.10.2",
   "orchestrator_pull_request": "https://github.com/cornellev/orchestrator/pull/1",
