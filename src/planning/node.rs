@@ -58,7 +58,13 @@ pub fn planned_update(
             .as_ref()
             .ok_or_else(|| crate::error("Missing vehicle"))?,
     )?;
-    match planner.plan(&grid, &state, goal) {
+    match planner.plan(
+        &grid,
+        &state,
+        goal,
+        spec.clearance_m(),
+        ctx.info.goal_tolerance_m,
+    ) {
         Some(path) => {
             crate::planning::validation::validate_path(
                 &grid,

@@ -33,6 +33,8 @@ A LiDAR point starts where the sensor is looking: x forward, y to the left, in m
 
 `Perception` in `src/perception/algorithm.rs` holds the map. `update` is handed an `Observation`, which is the pose, the scan points, and the sensor mount, and it should return `Some(&self.map)` once you have a map. Right now it returns `None`, which is why the car never moves. The runner builds an empty grid and passes it to `Perception::new`. An empty cell means free. That's reasonable on these courses, where the obstacles sit still and the car can see them. It would be a bad assumption on a course the car hasn't fully looked at.
 
+The browser's vehicle origin is `base_link`. `rear_axle_in_base.x` is −0.1 m, so a base_link pose at x = 1.1 is the planning fixture's start at x = 1.0, and the bundle's finish waypoint at x = 8.1 is the course goal `(8, 0)`. The pose you receive is already the rear axle, with +x forward and +y left. The bundle itself is a different frame: Y is up, and heading is `(cos yaw, 0, −sin yaw)`. The nodes have already done that conversion. `scenarios/detour.json` and `scenarios/blocked.json` store an empty grid. The obstacles for `cargo run -- planning` are in `fixtures/planning`. The live obstacle arrives as LiDAR.
+
 `Grid::cell` gives you the column and row of a world point, or `None` if the point is off the map. Columns follow x, rows follow y, and the cell is stored at `row * width + column`. `set_occupied` paints one cell, and ignores a column or row that isn't on the map. `center` is the middle of a cell. You'll want that later, when a planner has to turn cells back into points. None of these helpers decide which returns are obstacles.
 
 You don't write the perception networking. `src/perception/node.rs` already subscribes to pose and LiDAR, and `ObservationJoin` already pairs a pose with the scan from the same moment.
@@ -53,11 +55,11 @@ Once that's boring, the usual next steps are tracing rays to mark free space, an
 
 Given where the car is, where it wants to go, and the map, what route misses the obstacles?
 
-Treat the open cells as places you can step, and pretend every step costs something. You want the cheap route. If you've heard of a cost function, this is that: you pay for each action, and you'd like the smallest bill. Dijkstra's algorithm always expands the cell that's cheapest to reach from the start, so it wanders over a wide area. A* also guesses how far is left to the goal, which pulls the search toward cells that are actually getting closer. The guess has to be honest. If you claim the goal is closer than it is, A* can miss the best route. We'll talk through this in person. If the bookkeeping feels like a lot, start with a plain breadth-first search and add the guess once the search itself works. A* is the version to end up with. `VecDeque` and `BinaryHeap` are in the standard library, so you don't need another crate.
+Treat the open cells as places you can step, and pretend every step costs something. You want the cheap route. If you've heard of a cost function, this is that: you pay for each action, and you'd like the smallest bill. Dijkstra's algorithm always expands the cell that's cheapest to reach from the start, so it wanders over a wide area. A* also guesses how far is left to the goal, which pulls the search toward cells that are actually getting closer. The guess has to be honest. If you claim the goal is closer than it is, A* can miss the best route. We'll talk through this in person. If the bookkeeping feels like a lot, start with a plain breadth-first search and add the guess once the search itself works. A* is the version to end up with. `VecDeque` and `BinaryHeap` are in the standard library, so you don't need another crate. `f64` can't be ordered by `BinaryHeap`. Use `total_cmp`, or store the cost as an integer. A helper that returns `impl Iterator` while looking at the grid borrows the grid for the life of that iterator. Return a `Vec` if the compiler complains about a captured lifetime.
 
-`Planner::plan` in `src/planning/algorithm.rs` gets the grid, where the car is, and the goal. Return the waypoints, or `None` if there's no way through. Right now it returns `None`. A path is a list of world points, starting near the car and ending near the goal.
+`Planner::plan` in `src/planning/algorithm.rs` gets the grid, where the car is, the goal, `clearance_m`, and `goal_tolerance_m`. Return the waypoints, or `None` if there's no way through. Right now it returns `None`. A path is a list of world points, starting near the car and ending near the goal. The last point has to land inside `goal_tolerance_m`.
 
-`Grid::blocked` is true for an occupied cell, and also for a column or row off the map. `Grid::clear` asks whether a circle around a point is empty. `Grid::segment_clear` asks the same thing for the strip between two points. `Grid::center` turns a cell back into a point on the path. `VehicleSpec::clearance_m` is a circle around the rear axle big enough to cover the whole car no matter which way it points. Use it. A route that fits a point, and not the car, will clip a wall.
+`Grid::blocked` is true for an occupied cell, and also for a column or row off the map. `Grid::clear` asks whether a circle around a point is empty. Pass `clearance_m` as that radius. `Grid::segment_clear` asks the same thing for the strip between two points, with the same radius. `Grid::center` turns a cell back into a point on the path. `clearance_m` comes from `VehicleSpec::clearance_m`: a circle around the rear axle big enough to cover the whole car no matter which way it points. On this starter car that circle is about 0.266 m, and every course uses a 0.2 m goal tolerance. Use the arguments. They already carry those numbers. A route that fits a point, and not the car, will clip a wall.
 
 `planned_update` in `src/planning/node.rs` calls your planner and then `validate_path`. That check wants real numbers, a first point within two cell widths of the car, a last point close enough to the goal, and clearance on every point and on every segment between them. `None` from you becomes "no path." A path the checker rejects is an error, so build one it will take.
 
@@ -68,7 +70,7 @@ cargo run -- planning --scenario blocked
 cargo test --test planning -- --ignored
 ```
 
-Those three commands load maps we already made. They don't run your perception. Empty and detour should come back with a route. Blocked should come back with no path.
+Those three commands load maps we already made. They don't run your perception. Empty and detour should come back with a route. Blocked should come back with no path, and the message says that is the expected result. An empty or detour run that returns nothing says the planner is still unfinished. `cargo run -- perception` saying a map was returned only means `update` returned `Some`. The cell check is `cargo test --test perception -- --ignored`.
 
 One warning. A path that stays on empty cells can still include a corner the car can't turn. Leave some room, keep the speed down, and let the controller look ahead.
 
@@ -84,7 +86,7 @@ You still choose how far ahead to look, which point that is, how you walk along 
 
 `Controller` in `src/controls/algorithm.rs` is built with the car's measurements. `command` gets the current pose and speed, the waypoints, and `dt_s`, the seconds since the last update. It returns a `DriveCommand`. Right now that's a full stop. Positive steering is a left turn. Positive speed is forward.
 
-`controlled_update` in `src/controls/node.rs` is the wrapper around your function. It publishes a stop when the path is missing, isn't ready, or is too old, and when `dt_s` isn't a real positive number of seconds. An empty list of points, or a point that isn't a real number, comes back as an error from the wrapper. Your function should still stop if it's handed an empty path. `VehicleSpec::limit` clamps a real command to the car's max forward speed and max steering angle. The wrapper uses that to reject NaN and infinity, then publishes the numbers you returned. The simulator clamps them again before anything moves. You don't decide when the car has arrived. The runner does, and it has its own safety stop. The commands below read a path from a file, so your perception and planner stay out of it.
+`controlled_update` in `src/controls/node.rs` is the wrapper around your function. It publishes a stop when the path is missing, isn't ready, or is too old, and when `dt_s` isn't a real positive number of seconds. An empty list of points, or a point that isn't a real number, comes back as an error from the wrapper. Your function should still stop if it's handed an empty path. `VehicleSpec::limit` clamps a real command to the car's max forward speed and max steering angle. The wrapper uses that to reject NaN and infinity, then publishes the numbers you returned. The runner notices when `limit` would have changed them. The controls test looks at that return, so `command` itself has to stay inside the limits, and the speed on that fixture has to be greater than zero. The simulator clamps again before anything moves. You don't decide when the car has arrived. The runner does, and it has its own safety stop. The commands below read a path from a file, so your perception and planner stay out of it.
 
 ```sh
 cargo test --test controls -- --ignored
@@ -121,7 +123,7 @@ cargo run -- node planning --run planning-practice
 cargo test --test wiring -- --ignored
 ```
 
-Use `perception` or `controls` in place of `planning` to practice those. This publisher only talks to the router on your machine. The wiring tests accept "no path" and "stop" before the algorithms exist. Once an algorithm works, they also accept a real path and a real finite command. The tests in the earlier sections still want the real algorithms.
+Use `perception` or `controls` in place of `planning` to practice those. This publisher only talks to the router on your machine. The wiring tests accept an unavailable map or a ready one, "no path" or a real path, and "stop" or a real finite command. `cargo test --locked` stays green either way. The tests in the earlier sections still want the real algorithms.
 
 ## Showing your work
 
@@ -133,7 +135,7 @@ cargo run -- autonomous --scenario detour
 cargo run -- autonomous --scenario blocked
 ```
 
-`autonomous` starts all three programs. Until planning and controls are connected, it tells you what's missing and the car stays put. If the run ends without reaching the goal, the command fails. While you're still working, use `--duration 5` or Ctrl-C. By the end, reach the goal on the empty course and the detour course, and stop on the blocked course.
+`autonomous` starts all three programs. Until planning and controls are connected, it tells you what's missing and the car stays put. If the empty or detour run ends without reaching the goal, the command fails. The blocked course is the exception: stopping without an `ego-collision` exits 0, and hitting the wall exits with an error. While you're still working, use `--duration 5` or Ctrl-C. By the end, reach the goal on the empty course and the detour course, and stop on the blocked course.
 
 Save a result from early on. Find one thing that's wrong, either in the files or in the browser's Analysis and Replay views, change it, and compare. The folder the command prints contains `node-events.jsonl`, `updates.csv`, `summary.json`, and `view.svg`. The CSV is seconds, meters, and radians, on the simulator's clock. In the picture, the path you asked for is blue and the path the car drove is orange. The same course is a fair comparison. The exact trace can still wobble, because the browser's timing isn't perfectly repeatable.
 
@@ -154,7 +156,13 @@ Most of the time it's one of these.
 - A path through a wall checked the cells under the waypoints and skipped the line between them.
 - Steering away from the path means the sign is backwards. Positive steering is left. Try both directions on a short path.
 - "Command limited" means the numbers were real, and bigger than the car's speed or steering limit.
-- Updates slower than about 300 ms stop the car. That watchdog is intentional.
+- Updates slower than 300 ms stop the car. That watchdog is `FRESH_NS` in the Rust nodes and the same 300 ms in orchestrator's command adapter. Leave the bundle's 100 ms command `timeoutNs` and 200 ms `validityNs` as they are.
+- "No connected simulator tab", "More than one connected simulator tab", and "The simulator tab still has a run going" are three different problems. Stop the run, and keep a single simulator tab.
+- "The process at … is not the simulator" means `--server` is some other program. Use the simulator from getting started. Another program on port 3000 produces this message.
+- "Start the router: zenohd -c config/zenoh-router.json5" means the local Zenoh router is not running.
+- A hash mismatch means the saved course disagrees with its sidecar. Run `setup` against a fresh simulator data directory. Don't edit the hash.
+- If you restart orchestrator after the page connected, refresh the page.
+- `simulator_passed: false` after the car reached the goal can mean the browser recorded the stop as an interruption. Check `goal_reached` and the termination reason in `summary.json`.
 
 When the compiler complains, read the first error. A reference lets you look at a value. It doesn't store one. Keep the map, the search, and the controller's progress on your struct. If you're still borrowing that struct, finish the borrow before you change it.
 

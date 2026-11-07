@@ -71,7 +71,8 @@ fn path_validator_catches_collisions_between_waypoints_and_bad_endpoints() {
     let (start, goal) = (Point2 { x: 1.0, y: 1.0 }, Point2 { x: 4.0, y: 1.0 });
     validate_path(&map, &[start, goal], start, goal, 0.1, 0.2).unwrap();
     map.set_occupied(25, 10, true);
-    assert!(validate_path(&map, &[start, goal], start, goal, 0.1, 0.2).is_err());
+    let blocked = validate_path(&map, &[start, goal], start, goal, 0.1, 0.2).unwrap_err();
+    assert!(blocked.to_string().contains("segment"), "{blocked}");
     assert!(validate_path(&map, &[], start, goal, 0.1, 0.2).is_err());
     assert!(validate_path(
         &map,
@@ -121,14 +122,35 @@ fn stop_defaults_nonfinite_rejection_and_command_limits() {
 }
 
 #[test]
-fn unfinished_algorithms_are_safe_and_independent() {
-    use cev_onboarding::{controls::Controller, perception::Perception, planning::Planner};
+fn algorithms_stay_safe_before_and_after_implementation() {
+    use cev_onboarding::{
+        controls::Controller, perception::Perception, planning::validation::validate_path,
+        planning::Planner,
+    };
     let course = course();
     let obs = observation(100_000_000);
-    assert!(Perception::new(course.grid.clone()).update(&obs).is_none());
-    assert!(Planner::default()
-        .plan(&course.grid, &obs.state, course.goal)
-        .is_none());
+    let mut perception = Perception::new(course.grid.clone());
+    if let Some(map) = perception.update(&obs) {
+        map.validate().unwrap();
+    }
+    let mut planner = Planner::default();
+    if let Some(path) = planner.plan(
+        &course.grid,
+        &obs.state,
+        course.goal,
+        course.vehicle.clearance_m(),
+        course.goal_tolerance_m,
+    ) {
+        validate_path(
+            &course.grid,
+            &path,
+            obs.state.pose.position,
+            course.goal,
+            course.vehicle.clearance_m(),
+            course.goal_tolerance_m,
+        )
+        .unwrap();
+    }
     assert_eq!(
         Controller::new(course.vehicle).command(&obs.state, &[], 0.1),
         DriveCommand::STOP

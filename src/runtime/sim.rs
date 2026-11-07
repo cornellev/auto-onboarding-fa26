@@ -278,16 +278,24 @@ fn single_browser(tabs: &simcontrol::Tabs) -> Result<String> {
         .iter()
         .filter(|t| t.status.connected)
         .collect();
-    if connected.len() != 1
-        || connected.iter().any(|t| {
-            matches!(
-                t.status.snapshot.status.as_str(),
-                "running" | "paused" | "ready" | "preparing"
-            )
-        })
-    {
+    if connected.is_empty() {
         return Err(crate::error(
-            "Use exactly one connected simulator tab, with its run stopped",
+            "No connected simulator tab. Open the simulator and leave the run stopped.",
+        ));
+    }
+    if connected.len() != 1 {
+        return Err(crate::error(
+            "More than one connected simulator tab. Close the extras and leave one run stopped.",
+        ));
+    }
+    if connected.iter().any(|tab| {
+        matches!(
+            tab.status.snapshot.status.as_str(),
+            "running" | "paused" | "ready" | "preparing"
+        )
+    }) {
+        return Err(crate::error(
+            "The simulator tab still has a run going. Stop it, then start again.",
         ));
     }
     Ok(connected[0].status.browser_id.clone())
@@ -336,7 +344,22 @@ impl Sim {
     pub fn prepare(course: &Course, server: &str, mode: &str) -> Result<Self> {
         course.validate()?;
         let client = simcontrol::Client::with_timeout(server, Duration::from_secs(30))?;
-        let tabs = client.get_tabs()?;
+        let tabs = match client.get_tabs() {
+            Ok(tabs) => tabs,
+            Err(err)
+                if matches!(
+                    err.kind,
+                    simcontrol::ErrorKind::Http
+                        | simcontrol::ErrorKind::InvalidResponse
+                        | simcontrol::ErrorKind::Transport
+                ) =>
+            {
+                return Err(crate::error(format!(
+                    "The process at {server} is not the simulator ({err})"
+                )));
+            }
+            Err(err) => return Err(err.into()),
+        };
         let browser = single_browser(&tabs)?;
         resolve_course(server, course)?;
         let run_id = uuid::Uuid::new_v4().to_string();

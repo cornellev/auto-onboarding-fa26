@@ -14,11 +14,7 @@ pub struct Course {
 }
 
 impl Course {
-    /**
-     * Validates the vehicle, grid, goal, positive tolerances and timeout, and controls path.
-     * The goal must lie within the grid and the controls path must contain finite waypoints.
-     * @return Ok(()) if the course passes these checks, or a validation error.
-     */
+    /// The goal has to land on the grid, the tolerances and timeout have to be positive, and the practice path has to be real numbers.
     pub fn validate(&self) -> Result<()> {
         self.vehicle.validate()?;
         self.grid.validate()?;

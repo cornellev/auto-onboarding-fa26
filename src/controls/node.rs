@@ -1,9 +1,12 @@
-//! Subscribe to state and path, and publish commands. `run` is yours. `controlled_update` is already written.
+//! Subscribe to state and path, and publish commands. `run` is where you should implement your code, but `controlled_update` is already written.
+
+// Connect to the context
 use crate::runtime::node::Context;
 use crate::{
     shared::protocol::{self, pb},
     Result,
 };
+
 /// Still waiting for the state and path subscriptions, and the command publisher.
 /// Copy the shape of `perception::node::run`.
 pub fn run(mut ctx: Context) -> Result<()> {

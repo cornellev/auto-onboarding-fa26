@@ -129,7 +129,7 @@ fn run() -> Result<()> {
         let mut perception = Perception::new(course.grid.clone());
         let map = perception.update(&observation);
         reporter.summary.status = if map.is_some() {
-            "perception fixture complete"
+            "map returned; run cargo test --test perception -- --ignored to check the cells"
         } else {
             "perception unavailable: implement Perception::update"
         }
@@ -150,7 +150,13 @@ fn run() -> Result<()> {
             load(fixture.unwrap_or_else(|| format!("fixtures/planning/{scenario}.json")))?;
         fixture.grid.validate()?;
         fixture.vehicle.validate()?;
-        let path = Planner::default().plan(&fixture.grid, &fixture.start, fixture.goal);
+        let path = Planner::default().plan(
+            &fixture.grid,
+            &fixture.start,
+            fixture.goal,
+            fixture.vehicle.clearance_m(),
+            course.goal_tolerance_m,
+        );
         if let Some(path) = &path {
             cev_onboarding::planning::validation::validate_path(
                 &fixture.grid,
@@ -163,8 +169,10 @@ fn run() -> Result<()> {
         }
         reporter.summary.status = if path.is_some() {
             "planning fixture complete"
+        } else if scenario == "blocked" {
+            "no path, which is the expected result when the goal is walled off"
         } else {
-            "no path returned: implement Planner::plan, or verify the goal is blocked"
+            "no path returned: implement Planner::plan"
         }
         .into();
         reporter.finish(&fixture.grid, path.as_deref().unwrap_or(&[]), fixture.goal)?;
@@ -439,7 +447,13 @@ fn run() -> Result<()> {
     reporter.finish(&map, &path, course.goal)?;
     result?;
     finished?;
-    if matches!(mode, Mode::Autonomous | Mode::Controls) && !reporter.summary.goal_reached {
+    if scenario == "blocked" && mode == Mode::Autonomous {
+        if reporter.summary.termination_reason.as_deref() == Some("ego-collision") {
+            return Err(error(
+                "Blocked course hit an obstacle; inspect node-events.jsonl and view.svg",
+            ));
+        }
+    } else if matches!(mode, Mode::Autonomous | Mode::Controls) && !reporter.summary.goal_reached {
         return Err(error("Goal not reached; inspect node-events.jsonl and implement the indicated wiring/algorithm"));
     }
     Ok(())

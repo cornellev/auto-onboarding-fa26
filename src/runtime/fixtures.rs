@@ -1,4 +1,4 @@
-//! Transport exercises use their own namespace and have no actuator binding.
+//! Practice publishers for one component. They talk to the local router and don't move the car.
 use crate::{
     shared::grid::Grid,
     shared::protocol::{self, pb},
@@ -13,14 +13,9 @@ use std::{
     },
     time::{Duration, Instant},
 };
-/**
- * Publishes transport fixtures at 10 Hz without a simulator or actuator binding.
- * @param role The component to exercise: perception, planning, or controls.
- * @param run The fixture run ID, or None to generate a new UUID.
- * @param duration The publication duration in seconds, or None for 60 seconds.
- * @param interrupted The shared flag used to stop publication early.
- * @return Ok(()) when the duration expires or interruption is requested, or a setup/publication error.
- */
+
+/// Publish practice messages for `perception`, `planning`, or `controls`, about 10 times a second.
+/// Runs for `duration` seconds, or 60 if you don't pass one. The car in the browser is not involved.
 pub fn publish(
     role: &str,
     run: Option<String>,

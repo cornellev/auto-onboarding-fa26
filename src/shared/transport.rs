@@ -32,8 +32,13 @@ impl Transport {
             })
             .to_string(),
         )?;
+        let session = zenoh::open(config).wait().map_err(|err| {
+            crate::error(format!(
+                "Start the router: zenohd -c config/zenoh-router.json5 ({err})"
+            ))
+        })?;
         Ok(Self {
-            session: zenoh::open(config).wait()?,
+            session,
             run: run.into(),
         })
     }
