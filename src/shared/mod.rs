@@ -1,4 +1,6 @@
-//! Types, geometry, Protobuf codecs, and Zenoh transport shared by every node.
+/**
+ * This module contains all of the different code shared between the nodes!
+ */
 pub mod grid;
 pub mod protocol;
 pub mod transport;

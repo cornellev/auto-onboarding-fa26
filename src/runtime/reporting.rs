@@ -20,6 +20,10 @@ pub struct Summary {
 }
 
 impl Default for Summary {
+    /**
+     * Creates a summary for a run that has not started.
+     * @return A summary with zero counters and unavailable measurements set to None.
+     */
     fn default() -> Self {
         Self {
             status: "not started".into(),
@@ -47,6 +51,12 @@ pub struct Reporter {
 }
 
 impl Reporter {
+    /**
+     * Creates a results directory and opens the update CSV and node-event log.
+     * Existing updates.csv and node-events.jsonl files in the directory are truncated.
+     * @param directory The directory where run artifacts will be written.
+     * @return A new reporter, or a filesystem or CSV-header write error.
+     */
     pub fn new(directory: impl AsRef<FilePath>) -> Result<Self> {
         let directory = directory.as_ref().to_path_buf();
         fs::create_dir_all(&directory)?;
@@ -64,6 +74,14 @@ impl Reporter {
         })
     }
 
+    /**
+     * Appends a node event to the JSON Lines log and flushes it to the file.
+     * @param node The name of the node that produced the event.
+     * @param detail The event description.
+     * @param time_ns The event timestamp in simulation nanoseconds.
+     * @param pid The process ID of the node.
+     * @return Ok(()) if the event is written and flushed, or an I/O error.
+     */
     pub fn event(&mut self, node: &str, detail: &str, time_ns: u64, pid: u32) -> Result<()> {
         writeln!(
             self.events,
@@ -74,6 +92,14 @@ impl Reporter {
         Ok(())
     }
 
+    /**
+     * Records an update, extends the trajectory, and refreshes distance and tracking statistics.
+     * @param observation The capture-aligned vehicle state, scan, and simulation timestamp.
+     * @param update The command, path, status, and saturation result for this update.
+     * @param goal The target position in map coordinates, in meters.
+     * @param compute_us The computation time for the update, in microseconds.
+     * @return Ok(()) if the CSV row is written and flushed, or an I/O error.
+     */
     pub fn record(
         &mut self,
         observation: &Observation,
@@ -119,6 +145,13 @@ impl Reporter {
         Ok(())
     }
 
+    /**
+     * Flushes updates, writes summary.json and view.svg, and prints the run result.
+     * @param map The occupancy grid to draw in the final view.
+     * @param path The requested route in map coordinates, in meters.
+     * @param goal The goal position to mark in the final view.
+     * @return Ok(()) if the artifacts are written, or a validation, serialization, or I/O error.
+     */
     pub fn finish(&mut self, map: &Grid, path: &[Point2], goal: Point2) -> Result<()> {
         self.csv.flush()?;
         fs::write(
@@ -149,6 +182,12 @@ impl Reporter {
     }
 }
 
+/**
+ * Finds the shortest distance from a point to the segments of a path.
+ * @param point The vehicle position in the same coordinate frame as the path.
+ * @param path The route waypoints; a single waypoint is treated as a point target.
+ * @return The distance in meters, or None if the path is empty.
+ */
 pub fn tracking_error(point: Point2, path: &[Point2]) -> Option<f64> {
     if path.is_empty() {
         return None;
@@ -173,6 +212,15 @@ pub fn tracking_error(point: Point2, path: &[Point2]) -> Option<f64> {
         .reduce(f64::min)
 }
 
+/**
+ * Writes an SVG showing occupied cells, the requested route, the actual trajectory, and the goal.
+ * @param file The output file path; an existing file is overwritten.
+ * @param map The occupancy grid defining the view's bounds and obstacles.
+ * @param path The requested route in map coordinates, in meters.
+ * @param trajectory The recorded vehicle positions in map coordinates, in meters.
+ * @param goal The target position in map coordinates, in meters.
+ * @return Ok(()) if the view is written, or a grid-validation or I/O error.
+ */
 pub fn write_svg(
     file: &FilePath,
     map: &Grid,

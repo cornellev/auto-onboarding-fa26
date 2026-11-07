@@ -5,13 +5,15 @@ pub struct Controller {
 }
 
 impl Controller {
+    /// `vehicle` has the wheelbase and the speed and steering limits.
     pub fn new(vehicle: VehicleSpec) -> Self {
         Self { vehicle }
     }
 
-    /// Select a target and command forward speed and positive-left steering.
+    /// Speed and steering to follow `path`. Positive steering is a left turn.
+    /// `dt_s` is the time since the last call, in seconds. This starter always stops.
+    /// See Controls in `docs/project.md`.
     pub fn command(&mut self, _state: &VehicleState, _path: &[Point2], _dt_s: f64) -> DriveCommand {
-        // Student task: see docs/challenges.md#controls.
         DriveCommand::STOP
     }
 }

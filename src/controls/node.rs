@@ -1,19 +1,22 @@
-//! Student task: subscribe to state/path and publish validated commands.
+//! Subscribe to state and path, and publish commands. `run` is yours. `controlled_update` is already written.
 use crate::runtime::node::Context;
 use crate::{
     shared::protocol::{self, pb},
     Result,
 };
+/// Still waiting for the state and path subscriptions, and the command publisher.
+/// Copy the shape of `perception::node::run`.
 pub fn run(mut ctx: Context) -> Result<()> {
-    // Receive pb::StateUpdate and pb::PathUpdate using bounded subscriptions.
-    // Retain the latest path, including unavailable results; tick at 10 Hz.
-    // Call controlled_update and publish to "command". Empty paths stop.
+    // Read StateUpdate and PathUpdate. Keep the latest path, even when it says there's nothing.
+    // Call controlled_update about 10 times a second and publish on "command".
     ctx.wait_for_wiring(
-        "implement controls Zenoh subscriptions and publication; docs/challenges.md#wiring",
+        "controls still needs its Zenoh subscribers and publisher; see docs/project.md, Connecting the pieces",
     )
 }
 
-/// Provided command helper. Republishing an old path never refreshes its deadline.
+/// Build a command from the latest state and path.
+/// Missing, unready, or expired paths, and a bad `dt_s`, become a stop.
+/// Publishing again does not refresh an old path's deadline. The simulator clamps the command later.
 pub fn controlled_update(
     ctx: &Context,
     state: &pb::StateUpdate,
@@ -63,7 +66,7 @@ pub fn controlled_update(
         return Err(crate::error("Invalid path points"));
     }
     let command = controller.command(&state, &points, dt_s);
-    // Keep finite requests for saturation reporting; the actuator boundary clamps them.
+    // Reject a non-finite command. The number we publish is the one the controller asked for.
     controller.vehicle.limit(command)?;
     out.command = Some(protocol::convert(&command)?);
     out.source = Some(source.clone());

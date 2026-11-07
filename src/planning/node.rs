@@ -1,19 +1,23 @@
-//! Student task: connect map subscription to Planner and path publication.
+//! Subscribe to maps and publish paths. `run` is yours. `planned_update` is already written.
 use crate::runtime::node::Context;
 use crate::{
     shared::protocol::{self, pb},
     Result,
 };
+/// Still waiting for the map subscription and the path publisher.
+/// Copy the shape of `perception::node::run`.
 pub fn run(mut ctx: Context) -> Result<()> {
-    // See ../perception/node.rs for the worked subscription/publication loop.
-    // Receive pb::MapUpdate; call planned_update; publish to "path".
-    // Keep source metadata unchanged. Report readiness after wiring is complete.
+    // Read MapUpdate, call planned_update, publish on "path".
+    // Copy the map's source time onto the path. Don't stamp it with "now".
     ctx.wait_for_wiring(
-        "implement planning Zenoh subscription and publication; docs/challenges.md#wiring",
+        "planning still needs its Zenoh subscriber and publisher; see docs/project.md, Connecting the pieces",
     )
 }
 
-/// Provided publication helper: validates the entire path and retains source age.
+/// Turn a map into a path message.
+/// A map that isn't ready stays that way. `None` from the planner becomes "no path."
+/// A path that fails the clearance check is an error.
+/// The map's source time is copied onto the path, so an old plan doesn't look new.
 pub fn planned_update(
     ctx: &Context,
     map: &pb::MapUpdate,

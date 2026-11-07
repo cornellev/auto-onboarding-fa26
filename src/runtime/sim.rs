@@ -12,7 +12,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// Install the authoring closure that ev-sim's run-bundle importer does not restore.
+/**
+ * Installs missing course resources and verifies their definitions against the supplied bundles.
+ * Restores the vehicle, environment, scenario, and run manifests needed by the importer.
+ * @param server The simulator server's base URL.
+ * @return Ok(()) if all supplied courses are installed and verified, or an I/O, API, or mismatch error.
+ */
 pub fn setup(server: &str) -> Result<()> {
     simcontrol::Client::new(server)?;
     let agent: ureq::Agent = ureq::Agent::config_builder()
@@ -89,6 +94,13 @@ pub fn setup(server: &str) -> Result<()> {
     Ok(())
 }
 
+/**
+ * Checks a resolved course against its supplied bundle without relying on portable timestamps.
+ * @param resolved The simulator's resolved run manifest and dependency hashes.
+ * @param bundle The supplied course bundle containing the expected definitions and hashes.
+ * @param course The course configuration containing the expected original resolved hash.
+ * @return The simulator's resolved hash, or an error if hashes differ or required data is missing.
+ */
 fn verify_course(
     resolved: &serde_json::Value,
     bundle: &serde_json::Value,
@@ -110,6 +122,12 @@ fn verify_course(
         .ok_or_else(|| crate::error("Missing resolved run hash"))
 }
 
+/**
+ * Loads a course bundle and asks the simulator to resolve and verify its run manifest.
+ * @param server The simulator server's base URL.
+ * @param course The course identifying the local bundle and installed run manifest.
+ * @return The verified resolved hash, or a file, API, or course-verification error.
+ */
 fn resolve_course(server: &str, course: &Course) -> Result<String> {
     let bundle: serde_json::Value = serde_json::from_slice(&std::fs::read(format!(
         "scenarios/{}.bundle.json",
@@ -132,6 +150,14 @@ fn resolve_course(server: &str, course: &Course) -> Result<String> {
     verify_course(&resolved, &bundle, course)
 }
 
+/**
+ * Sends a JSON request to CEV_ORCHESTRATOR_API, defaulting to http://localhost:8090.
+ * Uses CEV_API_TOKEN for bearer authentication when it is set.
+ * @param method The HTTP method; GET, DELETE, and PUT are explicit, with POST as the fallback.
+ * @param path The API path beginning with a slash.
+ * @param value The optional JSON body for PUT or POST requests.
+ * @return The JSON response, or a transport, JSON-decoding, or HTTP error.
+ */
 pub fn api(
     method: &str,
     path: &str,
@@ -147,6 +173,13 @@ pub fn api(
         token.as_deref(),
     )
 }
+/**
+ * Sends a JSON request without a bearer token, including to simulator storage.
+ * @param method The HTTP method; GET, DELETE, and PUT are explicit, with POST as the fallback.
+ * @param url The complete request URL.
+ * @param value The optional JSON body for PUT or POST requests.
+ * @return The JSON response, or a transport, JSON-decoding, or HTTP error.
+ */
 fn request(
     method: &str,
     url: &str,
@@ -154,6 +187,14 @@ fn request(
 ) -> Result<serde_json::Value> {
     request_with_token(method, url, value, None)
 }
+/**
+ * Sends a JSON request with a 10-second timeout and redirects disabled.
+ * @param method The HTTP method; GET, DELETE, and PUT are explicit, with POST as the fallback.
+ * @param url The complete request URL.
+ * @param value The JSON body for PUT or POST; None sends an empty object.
+ * @param token The optional bearer token; None sends an empty Authorization header.
+ * @return The JSON response, or an error on transport failure, invalid JSON, or HTTP status >= 400.
+ */
 fn request_with_token(
     method: &str,
     url: &str,
@@ -204,6 +245,10 @@ fn request_with_token(
     Ok(body)
 }
 
+/**
+ * Registers the bundled Protobuf profile after checking its schema fingerprint.
+ * @return Ok(()) if registration succeeds, or a profile, fingerprint, or API error.
+ */
 pub fn setup_profile() -> Result<()> {
     let profile: serde_json::Value =
         serde_json::from_str(include_str!("../../config/protobuf-profile.json"))?;
@@ -221,6 +266,12 @@ pub fn setup_profile() -> Result<()> {
     Ok(())
 }
 
+/**
+ * Selects the sole connected simulator browser and requires its run to be stopped.
+ * Disconnected browser history is ignored.
+ * @param tabs The simulator's browser inventory and current run statuses.
+ * @return The browser ID, or an error for multiple/no connected browsers or an active run.
+ */
 fn single_browser(tabs: &simcontrol::Tabs) -> Result<String> {
     let connected: Vec<_> = tabs
         .browsers
@@ -263,12 +314,25 @@ pub struct Sim {
     last_monitor: Instant,
 }
 impl Sim {
-    /// Diagnostic connection: only bounded drive-test motion is armed.
+    /**
+     * Prepares and resumes a diagnostic run with only bounded drive-test motion armed.
+     * @param course The course configuration to validate and launch.
+     * @param server The simulator server's base URL.
+     * @return The running simulator connection, or a preparation or resume error.
+     */
     pub fn launch(course: &Course, server: &str) -> Result<Self> {
         let mut sim = Self::prepare(course, server, "drive-test")?;
         sim.resume()?;
         Ok(sim)
     }
+    /**
+     * Creates a unique run manifest, connects transport, and activates routing with the run paused.
+     * Requires one connected, stopped simulator browser and a verified installed course.
+     * @param course The course configuration and vehicle specification to validate.
+     * @param server The simulator server's base URL.
+     * @param mode The run mode recorded in RunInfo, such as observe, controls, or drive-test.
+     * @return The prepared simulator connection, or a validation, file, API, or transport error.
+     */
     pub fn prepare(course: &Course, server: &str, mode: &str) -> Result<Self> {
         course.validate()?;
         let client = simcontrol::Client::with_timeout(server, Duration::from_secs(30))?;
@@ -382,6 +446,10 @@ impl Sim {
         )?;
         Ok(sim)
     }
+    /**
+     * Resumes the prepared browser simulation run.
+     * @return Ok(()) if the run resumes, or an error if the run is missing or the request fails.
+     */
     pub fn resume(&mut self) -> Result<()> {
         self.run
             .as_mut()
@@ -389,6 +457,12 @@ impl Sim {
             .resume()?;
         Ok(())
     }
+    /**
+     * Publishes a path using the latest matched scan as its source, preserving capture time.
+     * Does nothing until a scan is available; an empty path is published as NoPath.
+     * @param path The requested waypoints in map coordinates, in meters.
+     * @return Ok(()) if published or no scan is available, or a conversion or transport error.
+     */
     pub fn path(&self, path: &[Point2]) -> Result<()> {
         let Some(source) = &self.last_scan else {
             return Ok(());
@@ -416,6 +490,10 @@ impl Sim {
             },
         )
     }
+    /**
+     * Checks routing ownership and faults before fetching the browser run's status.
+     * @return The current simulator snapshot, or an error for a lost/faulted run or failed request.
+     */
     pub fn status(&self) -> Result<simcontrol::Snapshot> {
         let routing = api("GET", "/api/protobuf/runs", None)?;
         if routing["run"]["run_id"] != self.run_id || !routing["run"]["fault"].is_null() {
@@ -430,6 +508,10 @@ impl Sim {
             .status()?
             .snapshot)
     }
+    /**
+     * Sends STOP, removes routing, stops the browser run, and deletes its temporary manifest.
+     * @return The final simulator snapshot, or an error from any shutdown or cleanup step.
+     */
     pub fn finish(&mut self) -> Result<simcontrol::Snapshot> {
         self.stop()?;
         api(
@@ -455,6 +537,12 @@ impl Sim {
     }
 }
 impl VehicleIo for Sim {
+    /**
+     * Reads and joins state and LiDAR samples, rejecting invalid or expired observations.
+     * Periodically checks that the active routing run still belongs to this connection.
+     * @param timeout The maximum time to wait for a matching capture after the routing check.
+     * @return Some(observation) when matched, None on timeout, or a routing, data, or transport error.
+     */
     fn observe(&mut self, timeout: Duration) -> Result<Option<Observation>> {
         if self.last_monitor.elapsed() > Duration::from_millis(250) {
             let state = api("GET", "/api/protobuf/runs", None)?;
@@ -496,6 +584,12 @@ impl VehicleIo for Sim {
             std::thread::sleep(Duration::from_millis(5));
         }
     }
+    /**
+     * Limits a command to the vehicle specification and publishes it with a source deadline.
+     * Drive-test mode uses the last matched state; other modes use the last matched scan.
+     * @param command The requested forward speed in m/s and steering angle in radians.
+     * @return Ok(()) if published, or an error for non-finite input, missing motion source, or transport failure.
+     */
     fn drive(&mut self, command: DriveCommand) -> Result<()> {
         let command = self.spec.limit(command)?;
         let source = if self.info.mode == "drive-test" {
@@ -527,11 +621,19 @@ impl VehicleIo for Sim {
             },
         )
     }
+    /**
+     * Publishes a zero-speed, zero-steering command through the normal command path.
+     * @return Ok(()) if the STOP command is published, or a publication error.
+     */
     fn stop(&mut self) -> Result<()> {
         self.drive(DriveCommand::STOP)
     }
 }
 impl Drop for Sim {
+    /**
+     * Attempts to remove routing, stop the browser run, and delete its temporary manifest.
+     * Skips cleanup after finish has marked the run done and ignores cleanup errors.
+     */
     fn drop(&mut self) {
         if !self.done {
             let _ = api(

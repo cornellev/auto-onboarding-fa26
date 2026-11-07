@@ -1,4 +1,4 @@
-//! Worked transport example; the mapping algorithm remains a student task.
+//! The message loop for perception is done. The map still comes from `Perception::update`.
 use crate::runtime::node::Context;
 use crate::{
     perception::synchronizer::ObservationJoin,
@@ -10,6 +10,8 @@ use crate::{
 use prost::Message;
 use std::time::{Duration, Instant};
 use zenoh::{handlers::RingChannel, Wait};
+/// Subscribe to pose and LiDAR, pair the ones from the same moment, and publish a map.
+/// Stops if the input is nonsense, out of order, or older than the watchdog allows.
 pub fn run(mut ctx: Context) -> Result<()> {
     let states = ctx
         .transport

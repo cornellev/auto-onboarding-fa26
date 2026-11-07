@@ -1,6 +1,8 @@
-//! Provided whole-path clearance and endpoint checks.
+//! Checks a whole path: real numbers, a start near the car, an end near the goal, and room along the way.
 use crate::{shared::grid::Grid, shared::types::Point2, Result};
 
+/// The first point has to sit within two cell widths of the car, and the last within the goal tolerance.
+/// Every point, and every segment between points, has to clear the car's radius.
 pub fn validate_path(
     map: &Grid,
     path: &[Point2],

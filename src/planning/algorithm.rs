@@ -7,9 +7,9 @@ use crate::{
 pub struct Planner {}
 
 impl Planner {
-    /// Return a route from the current pose to the goal, or None if unavailable.
+    /// A route from the car to `goal`, or `None` if there isn't one.
+    /// This starter always returns `None`. See Planning in `docs/project.md`.
     pub fn plan(&mut self, _map: &Grid, _state: &VehicleState, _goal: Point2) -> Option<Path> {
-        // Student task: see docs/challenges.md#planning.
         None
     }
 }
