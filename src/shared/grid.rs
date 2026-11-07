@@ -10,20 +10,9 @@ pub struct Grid {
     pub occupied: Vec<bool>,
 }
 
-/**
- * Grid represents a 2D occupancy grid with a given origin, resolution, width, and height.
- * Each cell in the grid can be either occupied or unoccupied.
- * The grid provides methods to check if a point is within the grid, if a cell is blocked, and if a circle or line segment is clear of obstacles.
- */
+/// Columns follow world x, rows follow world y, and cell `(col, row)` lives at `row * width + col`.
+/// A fresh grid is all empty, and empty means free.
 impl Grid {
-    /**
-     * Creates a new empty grid with the given origin, resolution, width, and height.
-     * @param origin The origin of the grid in world coordinates.
-     * @param resolution_m The resolution of the grid in meters per cell.
-     * @param width The width of the grid in cells.
-     * @param height The height of the grid in cells.
-     * @return A new empty grid.
-     */
     pub fn empty(origin: Point2, resolution_m: f64, width: usize, height: usize) -> Result<Self> {
         // shortcut: unmarked cells are optimistic free space; add unknown cells before unseen/dynamic courses.
         let count = width
@@ -41,10 +30,6 @@ impl Grid {
         Ok(grid)
     }
 
-    /**
-     * Validates the grid's dimensions, resolution, origin, and storage.
-     * @return Ok(()) if the grid is valid, or an error if it is not.
-     */
     pub fn validate(&self) -> Result<()> {
         if !self.origin.is_finite()
             || !self.resolution_m.is_finite()
@@ -63,11 +48,7 @@ impl Grid {
         Ok(())
     }
 
-    /**
-     * Returns the column and the row of the cell containing the given point, or None if the point is outside the grid.
-     * @param point The point to check.
-     * @return The column and row of the cell containing the point, or None if the point is outside the grid.
-     */
+    /// Column and row of a world point. `None` if the point is off the map, or isn't a real number.
     pub fn cell(&self, point: Point2) -> Option<(usize, usize)> {
         if !point.is_finite() {
             return None;
@@ -81,12 +62,7 @@ impl Grid {
         }
     }
 
-    /**
-     * Returns the center of the cell at the given column and row, or None if the cell is outside the grid.
-     * @param col The column of the cell.
-     * @param row The row of the cell.
-     * @return The center of the cell (Point2), or None if the cell is outside the grid.
-     */
+    /// World position of the middle of that cell. `None` if the column or row is off the map.
     pub fn center(&self, col: usize, row: usize) -> Option<Point2> {
         (col < self.width && row < self.height).then_some(Point2 {
             x: self.origin.x + (col as f64 + 0.5) * self.resolution_m,
@@ -94,34 +70,19 @@ impl Grid {
         })
     }
 
-    /**
-     * Returns true if the cell at the given column and row is blocked (occupied or outside the grid).
-     * @param col The column of the cell.
-     * @param row The row of the cell.
-     * @return True if the cell is blocked, false otherwise.
-     */
+    /// Occupied, or off the map. Off the map counts as blocked so a route can't step outside.
     pub fn blocked(&self, col: usize, row: usize) -> bool {
         col >= self.width || row >= self.height || self.occupied[row * self.width + col]
     }
 
-    /**
-     * Mutates the cell at the given column and row to be occupied or unoccupied.
-     * @param col The column of the cell.
-     * @param row The row of the cell.
-     * @param occupied True to mark the cell as occupied, false to mark it as unoccupied.
-     */
+    /// Paint one cell. A column or row off the map is ignored.
     pub fn set_occupied(&mut self, col: usize, row: usize, occupied: bool) {
         if col < self.width && row < self.height {
             self.occupied[row * self.width + col] = occupied;
         }
     }
 
-    /**
-     * Returns true if the circle with the given center and radius is clear of obstacles, false otherwise.
-     * @param point The center of the circle.
-     * @param radius_m The radius of the circle in meters.
-     * @return True if the circle is clear, false otherwise.
-     */
+    /// Whether a circle around `point` misses every occupied cell and stays on the map.
     pub fn clear(&self, point: Point2, radius_m: f64) -> bool {
         if !point.is_finite() || !radius_m.is_finite() || radius_m < 0.0 {
             return false;
@@ -156,13 +117,7 @@ impl Grid {
         true
     }
 
-    /**
-     * Returns true if the line segment from point a to point b is clear of obstacles, false otherwise.
-     * @param a The start point of the segment.
-     * @param b The end point of the segment.
-     * @param radius_m The radius of the segment in meters.
-     * @return True if the segment is clear, false otherwise.
-     */
+    /// Whether the strip from `a` to `b`, thickened by `radius_m`, stays clear.
     pub fn segment_clear(&self, a: Point2, b: Point2, radius_m: f64) -> bool {
         let distance = a.distance(b);
         if !distance.is_finite() {

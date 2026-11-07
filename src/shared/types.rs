@@ -7,25 +7,18 @@ pub struct Point2 {
 }
 
 impl Point2 {
-    /**
-     * Returns the straight-line distance to another point.
-     * @param other The other point in the same coordinate frame.
-     * @return The distance in meters.
-     */
+    /// Straight-line distance, in meters. Both points need to be in the same frame.
     pub fn distance(self, other: Self) -> f64 {
         (self.x - other.x).hypot(self.y - other.y)
     }
 
-    /**
-     * Checks that both point coordinates are finite.
-     * @return True if neither coordinate is NaN or infinite, false otherwise.
-     */
     pub fn is_finite(self) -> bool {
         self.x.is_finite() && self.y.is_finite()
     }
 }
 
-/// REP-103, meters and radians. Vehicle poses refer to the rear axle midpoint.
+/// Meters and radians. A vehicle pose is the middle of the rear axle.
+/// Heading is counterclockwise from +x. In this frame, +x is forward and +y is left.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Pose2 {
     pub position: Point2,
@@ -33,11 +26,8 @@ pub struct Pose2 {
 }
 
 impl Pose2 {
-    /**
-     * Rotates and translates a local point into this pose's parent frame.
-     * @param point The point in the pose's local coordinate frame, in meters.
-     * @return The transformed point in the parent coordinate frame.
-     */
+    /// Rotate `point` by this heading, then add this position.
+    /// One call moves a point up a single frame: sensor into the car, or car into the world.
     pub fn transform(self, point: Point2) -> Point2 {
         let (sin, cos) = self.yaw_rad.sin_cos();
         Point2 {
@@ -46,20 +36,12 @@ impl Pose2 {
         }
     }
 
-    /**
-     * Checks that the position and yaw are finite.
-     * @return True if all pose values are finite, false otherwise.
-     */
     pub fn is_finite(self) -> bool {
         self.position.is_finite() && self.yaw_rad.is_finite()
     }
 }
 
-/**
- * Wraps an angle into the range from -pi to pi radians.
- * @param radians The angle in radians.
- * @return The equivalent wrapped angle, or NaN for a non-finite input.
- */
+/// Fold an angle into -π..π. A NaN or an infinity stays NaN.
 pub fn wrap_angle(radians: f64) -> f64 {
     radians.sin().atan2(radians.cos())
 }
@@ -72,23 +54,23 @@ pub struct VehicleState {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LidarScan {
+    /// Endpoints in the sensor frame. +x is forward, +y is left.
     pub points: Vec<Point2>,
+    /// Where the LiDAR is mounted, relative to the rear axle.
     pub sensor_in_vehicle: Pose2,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Observation {
+    /// Nanoseconds since the run started, at the moment this scan was taken.
     pub time_ns: u64,
     pub state: VehicleState,
     pub scan: LidarScan,
 }
 
 impl Observation {
-    /**
-     * Validates the vehicle pose, speed, sensor pose, and LiDAR points.
-     * @return Ok(()) if all values are finite and there are at most 100,000 points,
-     * or an error otherwise.
-     */
+    /// Pose, speed, sensor mount, and scan points all have to be real numbers.
+    /// More than 100,000 points is rejected.
     pub fn validate(&self) -> crate::Result<()> {
         if !self.state.pose.is_finite()
             || !self.state.speed_mps.is_finite()
@@ -122,21 +104,18 @@ pub struct VehicleSpec {
     pub wheelbase_m: f64,
     pub length_m: f64,
     pub width_m: f64,
-    /// Rear axle in the simulator's base_link REP-103 frame.
+    /// Where the rear axle sits in the simulator's base_link frame.
     pub rear_axle_in_base: Point2,
     pub sensor_in_vehicle: Pose2,
     pub max_speed_mps: f64,
     pub max_steering_rad: f64,
-    /// False for the supplied synthetic training vehicle. Never arm hardware with it.
+    /// The numbers in the starter are a made-up car. Don't treat them as a measured one.
     pub hardware_calibrated: bool,
 }
 
 impl VehicleSpec {
-    /**
-     * Validates vehicle dimensions, coordinate transforms, and actuator limits.
-     * Speed must be at most 0.3 m/s and steering must be less than pi/2 radians.
-     * @return Ok(()) if the specification is valid, or an error otherwise.
-     */
+    /// Lengths and limits have to be real and positive.
+    /// Speed tops out at 0.3 m/s. Steering stays under a right angle.
     pub fn validate(&self) -> crate::Result<()> {
         if [
             self.wheelbase_m,
@@ -159,21 +138,14 @@ impl VehicleSpec {
         Ok(())
     }
 
-    /**
-     * Returns the radius of a conservative clearance circle around the rear axle.
-     * The circle covers the vehicle footprint regardless of heading.
-     * @return The clearance radius in meters.
-     */
+    /// A circle around the rear axle big enough to cover the car, whichever way it's pointing.
     pub fn clearance_m(&self) -> f64 {
         (self.length_m / 2.0 + self.rear_axle_in_base.x.abs())
             .hypot(self.width_m / 2.0 + self.rear_axle_in_base.y.abs())
     }
 
-    /**
-     * Clamps a finite command to forward-only speed and the vehicle's steering limits.
-     * @param command The requested speed in m/s and steering angle in radians.
-     * @return The limited command, or an error if either requested value is non-finite.
-     */
+    /// Clamp speed to `0..=max_speed_mps` and steering to the car's limit.
+    /// Errors if either number isn't real. The caller decides whether to publish the clamped value.
     pub fn limit(&self, command: DriveCommand) -> crate::Result<DriveCommand> {
         if !command.speed_mps.is_finite() || !command.steering_rad.is_finite() {
             return Err(crate::error("Non-finite command rejected; stopping"));
