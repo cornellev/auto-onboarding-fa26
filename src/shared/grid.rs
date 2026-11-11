@@ -7,14 +7,14 @@ pub struct Grid {
     pub resolution_m: f64,
     pub width: usize,
     pub height: usize,
-    pub occupied: Vec<bool>,
+    pub weights: Vec<u8>,
 }
 
 /// Columns follow world x, rows follow world y, and cell `(col, row)` lives at `row * width + col`.
-/// A fresh grid is all empty, and empty means free.
+/// A fresh grid is all weight 0. The default cutoff treats that as free.
 impl Grid {
     pub fn empty(origin: Point2, resolution_m: f64, width: usize, height: usize) -> Result<Self> {
-        // shortcut: unmarked cells are optimistic free space; add unknown cells before unseen/dynamic courses.
+        // shortcut: weight 0 is free at the default cutoff; store >= 128 before unseen space must block.
         let count = width
             .checked_mul(height)
             .filter(|n| *n <= 1_000_000)
@@ -24,7 +24,7 @@ impl Grid {
             resolution_m,
             width,
             height,
-            occupied: vec![false; count],
+            weights: vec![0; count],
         };
         grid.validate()?;
         Ok(grid)
@@ -36,8 +36,8 @@ impl Grid {
             || self.resolution_m < 0.001
             || self.width == 0
             || self.height == 0
-            || self.width.checked_mul(self.height) != Some(self.occupied.len())
-            || self.occupied.len() > 1_000_000
+            || self.width.checked_mul(self.height) != Some(self.weights.len())
+            || self.weights.len() > 1_000_000
             || !(self.origin.x + self.width as f64 * self.resolution_m).is_finite()
             || !(self.origin.y + self.height as f64 * self.resolution_m).is_finite()
         {
@@ -70,15 +70,27 @@ impl Grid {
         })
     }
 
-    /// Occupied, or off the map. Off the map counts as blocked so a route can't step outside.
+    /// At least 128, or off the map. Off the map counts as blocked so a route can't step outside.
     pub fn blocked(&self, col: usize, row: usize) -> bool {
-        col >= self.width || row >= self.height || self.occupied[row * self.width + col]
+        col >= self.width || row >= self.height || self.is_occupied(col, row, None)
     }
 
-    /// Paint one cell. A column or row off the map is ignored.
-    pub fn set_occupied(&mut self, col: usize, row: usize, occupied: bool) {
+    /// True when the stored weight is at least `threshold`. `None` means 128.
+    /// Off the map is not occupied.
+    pub fn is_occupied(&self, col: usize, row: usize, threshold: Option<u8>) -> bool {
+        let threshold = threshold.unwrap_or(128);
+        col < self.width && row < self.height && self.weights[row * self.width + col] >= threshold
+    }
+
+    /// Write 255. A column or row off the map is ignored.
+    pub fn set_occupied(&mut self, col: usize, row: usize) {
+        self.set_weight(col, row, 255);
+    }
+
+    /// Write one belief, from 0 to 255. 0 clears the cell. A column or row off the map is ignored.
+    pub fn set_weight(&mut self, col: usize, row: usize, weight: u8) {
         if col < self.width && row < self.height {
-            self.occupied[row * self.width + col] = occupied;
+            self.weights[row * self.width + col] = weight;
         }
     }
 

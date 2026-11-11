@@ -53,8 +53,8 @@ pub struct Grid {
     pub width: u32,
     #[prost(uint32, tag = "4")]
     pub height: u32,
-    #[prost(bool, repeated, tag = "5")]
-    pub occupied: ::prost::alloc::vec::Vec<bool>,
+    #[prost(uint32, repeated, tag = "5")]
+    pub weights: ::prost::alloc::vec::Vec<u32>,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]

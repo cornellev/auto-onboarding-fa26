@@ -25,17 +25,17 @@ Send it with the [onboarding plan form](https://docs.google.com/forms/d/e/1FAIpQ
 
 Where are the obstacles?
 
-The basic version is an occupancy grid. Chop the ground into little squares, a few centimeters on a side. A square either has something in it, or it doesn't. You can also track "we haven't looked here," but skip that for now.
+The basic version is an occupancy grid. Chop the ground into little squares, a few centimeters on a side. Each cell holds a weight from 0 to 255. `set_occupied` writes 255. A weight of 128 or more is blocked. You can also track "we haven't looked here," but skip that for now.
 
 We give you the grid. You turn the LiDAR points into occupied cells.
 
 A LiDAR point starts where the sensor is looking: x forward, y to the left, in meters. The car's pose is the middle of the rear axle, in the same kind of coordinates, and the heading is in radians, counterclockwise from +x. `sensor_in_vehicle` says where the LiDAR is bolted on, relative to that axle. `Pose2::transform` does one move: rotate by the pose's heading, then shift by its position. Use it twice. First from the sensor into the car, then from the car into the world. If the car is facing 90° left, a point that was straight ahead of the sensor should land toward +y in the world. Check one point from the fixture on paper before you loop over a whole scan. The simulator keeps its own axis convention, and that's already converted before you see the points, so leave +y as left.
 
-`Perception` in `src/perception/algorithm.rs` holds the map. `update` is handed an `Observation`, which is the pose, the scan points, and the sensor mount, and it should return `Some(&self.map)` once you have a map. Right now it returns `None`, which is why the car never moves. The runner builds an empty grid and passes it to `Perception::new`. An empty cell means free. That's reasonable on these courses, where the obstacles sit still and the car can see them. It would be a bad assumption on a course the car hasn't fully looked at.
+`Perception` in `src/perception/algorithm.rs` holds the map. `update` is handed an `Observation`, which is the pose, the scan points, and the sensor mount, and it should return `Some(&self.map)` once you have a map. Right now it returns `None`, which is why the car never moves. The runner builds an empty grid and passes it to `Perception::new`. A new cell is 0, and 0 is free. That's reasonable on these courses, where the obstacles sit still and the car can see them. It would be a bad assumption on a course the car hasn't fully looked at.
 
 The browser's vehicle origin is `base_link`. `rear_axle_in_base.x` is −0.1 m, so a base_link pose at x = 1.1 is the planning fixture's start at x = 1.0, and the bundle's finish waypoint at x = 8.1 is the course goal `(8, 0)`. The pose you receive is already the rear axle, with +x forward and +y left. The bundle itself is a different frame: Y is up, and heading is `(cos yaw, 0, −sin yaw)`. The nodes have already done that conversion. `scenarios/detour.json` and `scenarios/blocked.json` store an empty grid. The obstacles for `cargo run -- planning` are in `fixtures/planning`. The live obstacle arrives as LiDAR.
 
-`Grid::cell` gives you the column and row of a world point, or `None` if the point is off the map. Columns follow x, rows follow y, and the cell is stored at `row * width + column`. `set_occupied` paints one cell, and ignores a column or row that isn't on the map. `center` is the middle of a cell. You'll want that later, when a planner has to turn cells back into points. None of these helpers decide which returns are obstacles.
+`Grid::cell` gives you the column and row of a world point, or `None` if the point is off the map. Columns follow x, rows follow y, and the cell is stored at `row * width + column`. `set_occupied` writes 255 into one cell. `set_weight` writes a belief from 0 to 255, and 0 clears the cell. Both ignore a column or row that isn't on the map. `is_occupied` is true when the stored weight is at least the threshold. Pass `None` for 128. Pass `Some(100)` to treat a weight of 100 as occupied, which the default does not. Rust has no default arguments, so `None` is how you ask for 128. `center` is the middle of a cell. You'll want that later, when a planner has to turn cells back into points. None of these helpers decide which returns are obstacles.
 
 You don't write the perception networking. `src/perception/node.rs` already subscribes to pose and LiDAR, and `ObservationJoin` already pairs a pose with the scan from the same moment.
 
@@ -49,7 +49,7 @@ cargo test --test perception -- --ignored
 
 The fixture is a small rotated pose with duplicate points, so you can check it by hand. Out in the open, an empty scan is normal, not a broken sensor. The detour course is where the hits show up. Try one point by hand, an empty scan, a hit off the map, the duplicate points, and then a live detour scan.
 
-Once that's boring, the usual next steps are tracing rays to mark free space, an explicit unknown cell, probabilities, ignoring noise, or letting old obstacles fade.
+Once that's boring, the usual next steps are tracing rays to mark free space, storing a belief with `set_weight` instead of a hard 255, ignoring noise, or letting old obstacles fade.
 
 ## Planning
 
@@ -59,7 +59,7 @@ Treat the open cells as places you can step, and pretend every step costs someth
 
 `Planner::plan` in `src/planning/algorithm.rs` gets the grid, where the car is, the goal, `clearance_m`, and `goal_tolerance_m`. Return the waypoints, or `None` if there's no way through. Right now it returns `None`. A path is a list of world points, starting near the car and ending near the goal. The last point has to land inside `goal_tolerance_m`.
 
-`Grid::blocked` is true for an occupied cell, and also for a column or row off the map. `Grid::clear` asks whether a circle around a point is empty. Pass `clearance_m` as that radius. `Grid::segment_clear` asks the same thing for the strip between two points, with the same radius. `Grid::center` turns a cell back into a point on the path. `clearance_m` comes from `VehicleSpec::clearance_m`: a circle around the rear axle big enough to cover the whole car no matter which way it points. On this starter car that circle is about 0.266 m, and every course uses a 0.2 m goal tolerance. Use the arguments. They already carry those numbers. A route that fits a point, and not the car, will clip a wall.
+`Grid::blocked` is true for a cell whose weight is at least 128, and also for a column or row off the map. That is `is_occupied` with `None`. `Grid::clear` asks whether a circle around a point is empty. Pass `clearance_m` as that radius. `Grid::segment_clear` asks the same thing for the strip between two points, with the same radius. `Grid::center` turns a cell back into a point on the path. `clearance_m` comes from `VehicleSpec::clearance_m`: a circle around the rear axle big enough to cover the whole car no matter which way it points. On this starter car that circle is about 0.266 m, and every course uses a 0.2 m goal tolerance. Use the arguments. They already carry those numbers. A route that fits a point, and not the car, will clip a wall.
 
 `planned_update` in `src/planning/node.rs` calls your planner and then `validate_path`. That check wants real numbers, a first point within two cell widths of the car, a last point close enough to the goal, and clearance on every point and on every segment between them. `None` from you becomes "no path." A path the checker rejects is an error, so build one it will take.
 

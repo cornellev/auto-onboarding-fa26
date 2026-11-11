@@ -8,40 +8,17 @@ You need Rust 1.88 or newer, including rustfmt and Clippy, Git, and a current de
 
 ## Install the simulator and orchestrator
 
-The revisions are in `config/services.json`. The simulator changes live in the local `services/sim` checkout, so run the installer from this repo, on macOS or Linux.
+Run the following script:
 
 ```sh
-EV_SIM_REPO="$PWD/services/sim" bash services/sim/install.sh \
-  --dir "$HOME/cev/ev-sim-onboarding" \
-  --ref 4a182c7921448d981d0b5d4543268e348ca251af --onboarding \
-  --orchestrator-ref 2128e43691bd205ef56c5266f69505f809a8178e \
-  --orchestrator-dir "$HOME/cev/orchestrator"
+curl -fsSL https://raw.githubusercontent.com/cornellev/ev-sim/main/install.sh | bash
 ```
 
-If a directory already has local changes, the installer refuses to check out an exact revision. Give it a clean directory. Open new terminals after it finishes, so they see the new commands. On this path you don't clone orchestrator yourself, and you don't activate a virtualenv. A plain GitHub install of the simulator can't fetch the local simulator revision.
+Then, `cd` into the simulator checkout and run:
 
-<details>
-<summary>Native Windows setup</summary>
-
-Install Node 22.22.2 and Python 3.12, then use PowerShell from this checkout. The simulator source has to be at `services/sim`. A fresh GitHub clone of this repo doesn't include it. The revisions are the same ones in `config/services.json`:
-
-```powershell
-git clone ./services/sim ev-sim
-git -C ev-sim checkout 4a182c7921448d981d0b5d4543268e348ca251af
-cd ev-sim
-npm ci
-cd ..
-git clone https://github.com/cornellev/orchestrator.git
-git -C orchestrator checkout 2128e43691bd205ef56c5266f69505f809a8178e
-cd orchestrator
-py -3.12 -m venv .venv
-./.venv/Scripts/python.exe -m pip install -r requirements.txt -r requirements-protobuf.txt
-./.venv/Scripts/python.exe scripts/install_zenoh.py
+```sh
+npm run build
 ```
-
-The router installer prints where it put `zenohd`. Use that full path if it isn't on PATH. Start orchestrator with `./.venv/Scripts/python.exe main.py` and the options below. You don't have to activate the virtualenv.
-
-</details>
 
 ## Start the services
 
@@ -60,7 +37,7 @@ orch --zenoh-profile cev-onboarding-v1 --zenoh-connect tcp/127.0.0.1:7447
 And in the simulator checkout you just installed:
 
 ```sh
-npm run dev
+npm start
 ```
 
 Open http://localhost:3000 in one browser tab, and leave the run stopped. If you restart orchestrator after the page connected, refresh the page. Don't start a second controller, or a second simulator tab, on this orchestrator.

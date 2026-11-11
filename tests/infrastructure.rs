@@ -57,10 +57,15 @@ fn grid_indexing_edges_and_clearance_use_whole_cells() {
         None
     );
     assert!(grid.blocked(20, 0));
-    grid.set_occupied(10, 10, true);
+    grid.set_occupied(10, 10);
     assert!(!grid.clear(Point2 { x: 0.11, y: 0.05 }, 0.02));
     assert!(grid.clear(Point2 { x: 0.3, y: 0.3 }, 0.05));
     assert!(!grid.segment_clear(Point2 { x: -0.5, y: 0.05 }, Point2 { x: 0.5, y: 0.05 }, 0.0));
+    assert_eq!(grid.weights[10 * grid.width + 10], 255);
+    grid.set_weight(11, 11, 100);
+    assert!(!grid.is_occupied(11, 11, None));
+    assert!(grid.is_occupied(11, 11, Some(100)));
+    assert!(!grid.is_occupied(20, 0, None));
     assert!(Grid::empty(Point2::default(), 0.0, 2, 2).is_err());
     assert!(Grid::empty(Point2::default(), 0.1, usize::MAX, usize::MAX).is_err());
 }
@@ -70,7 +75,7 @@ fn path_validator_catches_collisions_between_waypoints_and_bad_endpoints() {
     let mut map = Grid::empty(Point2::default(), 0.1, 50, 50).unwrap();
     let (start, goal) = (Point2 { x: 1.0, y: 1.0 }, Point2 { x: 4.0, y: 1.0 });
     validate_path(&map, &[start, goal], start, goal, 0.1, 0.2).unwrap();
-    map.set_occupied(25, 10, true);
+    map.set_occupied(25, 10);
     let blocked = validate_path(&map, &[start, goal], start, goal, 0.1, 0.2).unwrap_err();
     assert!(blocked.to_string().contains("segment"), "{blocked}");
     assert!(validate_path(&map, &[], start, goal, 0.1, 0.2).is_err());
