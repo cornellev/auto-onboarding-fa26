@@ -2,7 +2,7 @@
 
 Over the next month you're building the software that lets a minicar drive from a start to a goal without hitting what's in the way.
 
-That breaks into three questions. How does the car tell where the obstacles are? How does it pick a route? How does it steer and choose a speed so it actually follows that route? You'll answer them in Rust, and you'll check the answers in the simulator before any of this goes on a real car. We're not going to hand you the algorithms. We'll suggest a place to start, and the work sessions are where we walk through the ideas. Get a basic version working before you wander off into something fancier.
+That breaks into three questions. How does the car tell where the obstacles are? How does it pick a route? How does it steer and choose a speed so it actually follows that route? You'll answer them in Rust, and you'll check the answers in the simulator before any of this goes on a real car. We're not going to hand you the algorithms. We'll suggest a place to start, and the work sessions are where we walk through the ideas. Each section ends with a few readings, if you want to see how someone else worked that idea out. Get a basic version working before you wander off into something fancier.
 
 The code you already have compiles, talks to the simulator, and holds the car still. The three empty functions are yours: `Perception::update`, `Planner::plan`, and `Controller::command`.
 
@@ -50,6 +50,14 @@ The fixture is a small rotated pose with duplicate points, so you can check it b
 
 Once that's boring, the usual next steps are tracing rays to mark free space, storing a belief with `set_weight` instead of a hard 255, ignoring noise, or letting old obstacles fade.
 
+### Readings
+
+Check one point from the fixture on paper before you trust a formula from one of these. A couple of them draw the axes differently.
+
+- [Coordinate frames and sensor geometry](https://fixtherobot.dev/perception/theory/coordinate-frames-and-sensor-geometry/). How a point moves from the sensor, into the car, then into the world. Rotate, then shift. That is one call to `Pose2::transform`, and you do it twice. The worked example is the same check as doing one point by hand. The camera section is a different sensor.
+- [Grid maps and mapping with known poses](http://ais.informatik.uni-freiburg.de/teaching/ss14/robotics/slides/08-occupancy-mapping-mapping-with-known-poses.pdf). Freiburg's slides on an occupancy grid when the pose is already known, which it is here. Marking the cell a hit lands in is the basic version, and that is `set_occupied`. The log-odds update later in the slides is the `set_weight` version. Their pictures are for a sonar. Yours is a LiDAR point you already have in meters.
+- [Lidar to a grid map](https://atsushisakai.github.io/PythonRobotics/modules/3_mapping/lidar_to_grid_map_tutorial/lidar_to_grid_map_tutorial.html). How the cells along a beam get marked, which is the ray-tracing step. The angle-to-xy snippet in that tutorial is a different axis convention. Your scan points are already x forward and y left.
+
 ## Planning
 
 Given where the car is, where it wants to go, and the map, what route misses the obstacles?
@@ -75,6 +83,15 @@ One warning. A path that stays on empty cells can still include a corner the car
 
 If you get there with time left, smoothing, a different guess of the remaining distance, the car's turning radius, or a completely different search are all reasonable.
 
+### Readings
+
+The search is the part to learn. The path you return still has to be world points, from `Grid::center`, that `validate_path` will take.
+
+- [Introduction to A*](https://www.redblobgames.com/pathfinding/a-star/introduction.html), and the [implementation notes](https://www.redblobgames.com/pathfinding/a-star/implementation.html) that go with it. Breadth-first search, then Dijkstra, then A*, on a grid: the queue, the cell you came from, and how you rebuild the path. The guess of the remaining distance has to be no larger than the real distance, or A* can miss the best route. The Manhattan example on that page is the honest guess when every step is up, down, left, or right. A diagonal step that costs less than two of those needs straight-line distance. Their samples are Python.
+- [Heuristics](https://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html). Which guesses of the remaining distance stay honest, once the search itself works.
+- [Grid-based search](https://atsushisakai.github.io/PythonRobotics/modules/5_path_planning/grid_base_search/grid_base_search.html). The same three searches, drawn on a grid, with a radius so the route fits the car. Those examples grow the obstacles by that radius before searching. Here the grid stays as perception wrote it. Pass `clearance_m` to `Grid::clear` and `Grid::segment_clear`. Theta* on that page is one way to straighten the path. Hybrid A* is a search that also knows the car cannot turn in place.
+- [`VecDeque`](https://doc.rust-lang.org/std/collections/struct.VecDeque.html) is the queue for breadth-first search. [`BinaryHeap`](https://doc.rust-lang.org/std/collections/binary_heap/struct.BinaryHeap.html) is the one for Dijkstra and A*. It gives back the largest item first, so store the cost in a way that the cheapest cell comes out on top. `f64` is not ordered. `total_cmp`, or an integer cost, is how you put one in that heap.
+
 ## Controls
 
 The path is a list of points. What steering and speed make the car follow it?
@@ -96,6 +113,14 @@ cargo run -- controls --path fixtures/controls/curve.json
 Try a straight line, then a correction to the left, then one to the right, before you take on the curve.
 
 After that, people usually vary the lookahead with speed, slow down for corners, or wrap a feedback loop around this steering command.
+
+### Readings
+
+The pose you get is already the middle of the rear axle. Take the wheelbase from `vehicle.wheelbase_m`. If the distance to the target is zero, skip the division.
+
+- [Pure pursuit and geometric path tracking](https://mohammadijoo.github.io/CaaT_Academy/Lectures/Autonomous_Mobile_Robots_Course/Chapter15/Lesson1.html). Where `2y / L²` comes from, with the lookahead point in the car's frame, and why the steering angle is `atan(wheelbase * curvature)`. Positive y is a left turn. Sections 3 and 4 are the part that matches this car. The lookahead distance, the speed, and the points that have fallen behind the car are still yours to decide.
+- [Implementation of the Pure Pursuit Path Tracking Algorithm](https://publications.ri.cmu.edu/storage/publications/pub_files/pub3/coulter_r_craig_1992_1/coulter_r_craig_1992_1.pdf) (Coulter, 1992). Section 3.3 is the procedure: find the closest point on the path, walk forward to a point one lookahead away, bring that point into the car's frame, then turn it into a curvature. Section 4 is what a short lookahead and a long one each do. His figure measures the sideways offset along the rear axle. On this car the sideways axis is y, to the left, and the curvature is `2y / L²`.
+- [Automatic Steering Methods for Autonomous Automobile Path Tracking](https://publications.ri.cmu.edu/storage/publications/pub_files/2009/2/Automatic_Steering_Methods_for_Autonomous_Automobile_Path_Tracking.pdf) (Snider, 2009). Sections 2.1 and 2.2 are the bicycle model and the same curvature, written as `2 sin(α) / L`. That is `2y / L²` when y is the sideways distance to the lookahead point. The rest of 2.2 is why the lookahead usually grows with speed, and why a short one wiggles while a long one cuts the corner. Section 2.3, the Stanley method, is one feedback law people try after pure pursuit is driving.
 
 ## Connecting the pieces
 
@@ -123,6 +148,12 @@ cargo test --test wiring -- --ignored
 ```
 
 Use `perception` or `controls` in place of `planning` to practice those. This publisher only talks to the router on your machine. The wiring tests accept an unavailable map or a ready one, "no path" or a real path, and "stop" or a real finite command. `cargo test --locked` stays green either way. The tests in the earlier sections still want the real algorithms.
+
+### Readings
+
+`run` in `src/perception/node.rs` is the loop to copy. It subscribes, reads with `transport::receive`, and publishes with `put`.
+
+- [Your first Zenoh app](https://zenoh.io/docs/getting-started/first-app/). A publisher puts bytes on a key, and a subscriber receives whatever is published there. That is the relationship between the three programs. The sample opens its own session and publishes a string. This program already has a session on `Context`. The key for this run comes from `transport.key`, and the bytes are `encode_to_vec` on a protobuf message.
 
 ## Showing your work
 
