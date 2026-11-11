@@ -14,27 +14,31 @@ Run the following script:
 curl -fsSL https://raw.githubusercontent.com/cornellev/ev-sim/main/install.sh | bash
 ```
 
-Then, `cd` into the simulator checkout and run:
+Then, `cd` into the simulator folder and run:
 
 ```sh
 npm run build
 ```
 
+## Terminology
+
+When we refer to this repo, we mean the base directory containing the README.md!
+
 ## Start the services
 
-Three terminals. From this checkout, the router:
+Three terminals. From this repo (the base directory containing the README.md), begin the Zenoh router:
 
 ```sh
 zenohd -c config/zenoh-router.json5
 ```
 
-Orchestrator:
+Then, assuming you've been able to install orchestrator (it gets installed with sim):
 
 ```sh
 orch --zenoh-profile cev-onboarding-v1 --zenoh-connect tcp/127.0.0.1:7447
 ```
 
-And in the simulator checkout you just installed:
+And, in the simulator that you just installed before, run this command to start it up!
 
 ```sh
 npm start
@@ -44,7 +48,9 @@ Open http://localhost:3000 in one browser tab, and leave the run stopped. If you
 
 ## Watch the starter
 
-Back in this checkout:
+Let's go and verify that everything is installed!
+
+Back in this repo, run the following commands to build and run the starter code. You should have the simulator open in your browser in the background.
 
 ```sh
 cargo test --locked
@@ -57,7 +63,9 @@ cargo run -- drive-test
 
 `observe` should show the timestamps moving and the sensor counts updating, while the car stays still. The square has cones, so you should see hits. `drive-test` creeps at no more than 0.1 m/s and 0.1 rad for one simulated second, then stops.
 
-Every run gets a new router id and a fresh copy of your algorithm's state. The simulator topics stay the ones on the `onboarding` manifest. Ctrl-C stops the run and writes the results. Connecting again doesn't resume the old run. Start a new one.
+Every run gets a new router id and a fresh copy of your algorithm's state. The simulator topics stay the ones on the `onboarding` manifest. 
+
+For all of the runs, Ctrl-C stops the run and writes the results. Connecting again doesn't resume the old run, it'll start a new one.
 
 ## Work on one piece
 
@@ -68,8 +76,7 @@ cargo run -- perception
 cargo run -- planning --scenario detour
 ```
 
-The message-loop fixtures only need the local router. The car in the browser isn't part of them:
-
+The message-loop fixtures only need the local router. The car in the browser isn't part of them:\
 ```sh
 cargo run -- fixture-publish planning --run planning-practice
 # In another terminal:

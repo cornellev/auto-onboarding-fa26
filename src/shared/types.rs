@@ -109,13 +109,13 @@ pub struct VehicleSpec {
     pub sensor_in_vehicle: Pose2,
     pub max_speed_mps: f64,
     pub max_steering_rad: f64,
-    /// The numbers in the starter are a made-up car. Don't treat them as a measured one.
+    /// False until someone measures a physical car. The starter numbers are the simulator minicar.
     pub hardware_calibrated: bool,
 }
 
 impl VehicleSpec {
     /// Lengths and limits have to be real and positive.
-    /// Speed tops out at 0.3 m/s. Steering stays under a right angle.
+    /// Speed tops out at 1 m/s, the simulator minicar's limit. Steering stays under a right angle.
     pub fn validate(&self) -> crate::Result<()> {
         if [
             self.wheelbase_m,
@@ -126,13 +126,13 @@ impl VehicleSpec {
         ]
         .iter()
         .any(|v| !v.is_finite() || *v <= 0.0)
-            || self.max_speed_mps > 0.3
+            || self.max_speed_mps > 1.0
             || self.max_steering_rad >= std::f64::consts::FRAC_PI_2
             || !self.rear_axle_in_base.is_finite()
             || !self.sensor_in_vehicle.is_finite()
         {
             return Err(crate::error(
-                "Invalid vehicle specification or speed cap above 0.3 m/s",
+                "Invalid vehicle specification or speed cap above 1 m/s",
             ));
         }
         Ok(())

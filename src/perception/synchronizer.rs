@@ -6,11 +6,13 @@ pub struct ObservationJoin {
     states: std::collections::BTreeMap<u64, (pb::Header, crate::shared::types::VehicleState)>,
     scans: std::collections::BTreeMap<u64, (pb::Header, crate::shared::types::LidarScan)>,
 }
+
 impl Default for ObservationJoin {
     fn default() -> Self {
         Self::new()
     }
 }
+
 impl ObservationJoin {
     pub fn new() -> Self {
         Self {

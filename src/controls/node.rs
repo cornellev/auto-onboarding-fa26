@@ -10,11 +10,13 @@ use crate::{
 /// Still waiting for the state and path subscriptions, and the command publisher.
 /// Copy the shape of `perception::node::run`.
 pub fn run(mut ctx: Context) -> Result<()> {
+    // Edit me...
     // Read StateUpdate and PathUpdate. Keep the latest path, even when it says there's nothing.
     // Call controlled_update about 10 times a second and publish on "command".
     ctx.wait_for_wiring(
         "controls still needs its Zenoh subscribers and publisher; see docs/project.md, Connecting the pieces",
     )
+    // ...till here.
 }
 
 /// Build a command from the latest state and path.

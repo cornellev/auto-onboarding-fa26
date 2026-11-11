@@ -1,4 +1,5 @@
 //! The message loop for perception is done. The map still comes from `Perception::update`.
+//! Ignore me! This is already wired up to Zenoh for you... but there's going to be a chance to actually wire up Zenoh yourself later on!
 use crate::runtime::node::Context;
 use crate::{
     perception::synchronizer::ObservationJoin,
@@ -10,6 +11,8 @@ use crate::{
 use prost::Message;
 use std::time::{Duration, Instant};
 use zenoh::{handlers::RingChannel, Wait};
+
+
 /// Subscribe to pose and LiDAR, pair the ones from the same moment, and publish a map.
 /// Stops if the input is nonsense, out of order, or older than the watchdog allows.
 pub fn run(mut ctx: Context) -> Result<()> {
@@ -19,12 +22,15 @@ pub fn run(mut ctx: Context) -> Result<()> {
         .declare_subscriber(ctx.transport.key("state"))
         .with(RingChannel::new(32))
         .wait()?;
+    
     let scans = ctx
         .transport
         .session
         .declare_subscriber(ctx.transport.key("lidar"))
         .with(RingChannel::new(8))
         .wait()?;
+
+
     let maps = ctx
         .transport
         .session
@@ -32,16 +38,21 @@ pub fn run(mut ctx: Context) -> Result<()> {
         .encoding(zenoh::bytes::Encoding::APPLICATION_PROTOBUF)
         .congestion_control(zenoh::qos::CongestionControl::Drop)
         .wait()?;
+
+
     let mut join = ObservationJoin::new();
     let (mut state_fresh, mut scan_fresh) = (Freshness::default(), Freshness::default());
     let mut perception = Perception::new(protocol::convert(ctx.info.grid.as_ref().unwrap())?);
     let mut last_observation = Instant::now();
     let mut received = false;
+
+    // alright, we're ready to go! publish a "ready" status and start the loop.
     ctx.status(
         true,
         "subscribed; waiting for capture-aligned observations",
         0,
     )?;
+
     while ctx.poll()? {
         while let Some(update) = transport::receive::<pb::StateUpdate>(&states, Duration::ZERO)? {
             let (h, state) = protocol::state(&update, &ctx.transport.run)?;

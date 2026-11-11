@@ -127,5 +127,5 @@ fn controls_wiring_publishes_a_stop_before_algorithm_is_implemented() {
         .expect("Wire the controller to publish commands");
     let command = update.command.unwrap();
     assert!(command.speed_mps.is_finite() && command.steering_rad.is_finite());
-    assert!((0.0..=0.3).contains(&command.speed_mps));
+    assert!((0.0..=1.0).contains(&command.speed_mps));
 }

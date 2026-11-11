@@ -102,8 +102,8 @@ fn stop_defaults_nonfinite_rejection_and_command_limits() {
         })
         .unwrap(),
         DriveCommand {
-            speed_mps: 0.3,
-            steering_rad: -0.5
+            speed_mps: 1.0,
+            steering_rad: -0.349066
         }
     );
     assert!(spec

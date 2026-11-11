@@ -3613,7 +3613,7 @@
   "start": {
     "pose": {
       "position": {
-        "x": 1.67,
+        "x": 1.663454,
         "y": 1.59
       },
       "yaw_rad": 3.141592653589793
@@ -3625,22 +3625,22 @@
     "y": -0.93
   },
   "vehicle": {
-    "wheelbase_m": 0.2,
-    "length_m": 0.3,
-    "width_m": 0.18,
+    "wheelbase_m": 0.18688,
+    "length_m": 0.297,
+    "width_m": 0.206,
     "rear_axle_in_base": {
-      "x": -0.1,
+      "x": -0.093454,
       "y": 0
     },
     "sensor_in_vehicle": {
       "position": {
-        "x": 0.1,
+        "x": 0.093454,
         "y": 0
       },
       "yaw_rad": 0
     },
-    "max_speed_mps": 0.3,
-    "max_steering_rad": 0.5,
+    "max_speed_mps": 1.0,
+    "max_steering_rad": 0.349066,
     "hardware_calibrated": false
   }
 }

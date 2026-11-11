@@ -6,20 +6,19 @@ That breaks into three questions. How does the car tell where the obstacles are?
 
 The code you already have compiles, talks to the simulator, and holds the car still. The three empty functions are yours: `Perception::update`, `Planner::plan`, and `Controller::command`.
 
-If the tools aren't installed, do [getting started](getting-started.md) first. November 7 is that, plus Git and Rust. November 12 we introduce perception, and November 14 is for building it. November 19 is the planning introduction and a checkpoint, so we'll look at what you have. November 21 is a planning work session. There's no required session over the November 25–29 break. December 3 is controls, and putting the three pieces together. December 5 you show it. December 6 is the deadline.
+If the tools aren't installed, do [getting started](getting-started.md) first. Remember to look at the project timeline posted in Discord. Just as a reminder, we'll be done with this project by **December 6** - at these sessions, you'll be sharing your code, not just your results.
 
 ## Your plan
 
-Before you disappear into the code, write a short plan for each of the three parts. It doesn't need to be a design document. We want to see that you've thought about the problem. You can change it later, and we'll tell you if the basic version looks unrealistic.
+Before you disappear into the code, remember your plan that you wrote down in the first session. It's important that you have *guidance* for what you're doing, and that you can explain it to someone else. Additionally, remember our concept of completing your MVP first before you add any extra features. You can always add more later, but you need to have a working version first!
 
-For perception, planning, and controls:
+### AI Usage
 
-1. What do you want to try? Our suggestion is fine. So is something else, if you can say why.
-2. If the semester gets messy, what's the smallest version you'd still be happy to finish?
-3. If that works and you have time left, what do you want to poke at?
-4. How will you know it's working?
+As a team, we use plenty of AI - this project's starter code was built by both me (Jaiden) and my AI agents, alongside a few of these instructions. Additionally, on your side this project can definitely be one-shotted by an AI agent, but we highly highly recommend that you do not do that. The goal of this project is to learn how to build autonomy software, and if you just have an AI agent do it for you, you won't learn anything. Instead, we recommend that you use AI agents as a tool to help you with your work, but not as a replacement for your work. For example, if you're stuck on a problem, you can ask an AI agent for help, but you should still try to solve the problem yourself first.
 
-Send it with the [onboarding plan form](https://docs.google.com/forms/d/e/1FAIpQLSeEyxzGgWWwgnLyo-RrHzSE_mUFvAUE2RkKRe8w2cJUkc6xzA/viewform?usp=header).
+Additionally, we'll be testing a bit of your understanding at the end of the semester. If you're spending some time implementing your own solution, you'll be able to answer our questions.
+
+GenAI is a very powerful tool that you can use to help you with your work, but you should be ultimately the architect and builder! There's a distinction between telling an AI agent to do something vs using it to build something. This project is small enough in scope that I'd limit it to explaining problems, trouble shooting, and minor code tweaks.
 
 ## Perception
 
@@ -33,7 +32,7 @@ A LiDAR point starts where the sensor is looking: x forward, y to the left, in m
 
 `Perception` in `src/perception/algorithm.rs` holds the map. `update` is handed an `Observation`, which is the pose, the scan points, and the sensor mount, and it should return `Some(&self.map)` once you have a map. Right now it returns `None`, which is why the car never moves. The runner builds an empty grid and passes it to `Perception::new`. A new cell is 0, and 0 is free. That's reasonable on these courses, where the obstacles sit still and the car can see them. It would be a bad assumption on a course the car hasn't fully looked at.
 
-The browser's vehicle origin is `base_link`. `rear_axle_in_base.x` is −0.1 m, so the onboarding spawn — a base_link near `(1.57, −1.59)` in the simulator, facing −x — is the planning start `(1.67, 1.59)`. The red marker is the course goal `(−1.65, −0.93)`. The pose you receive is already the rear axle, with +x forward and +y left. The simulator frame is different: Y is up, and heading is `(cos yaw, 0, −sin yaw)`. The nodes have already done that conversion. `scenarios/onboarding.json` stores an empty grid. The obstacles for `cargo run -- planning` are in `fixtures/planning`. The live cones arrive as LiDAR.
+The browser's vehicle origin is `base_link`. `rear_axle_in_base.x` is −0.093454 m, so the onboarding spawn — a base_link near `(1.57, −1.59)` in the simulator, facing −x — is the planning start `(1.663454, 1.59)`. The red marker is the course goal `(−1.65, −0.93)`. The pose you receive is already the rear axle, with +x forward and +y left. The simulator frame is different: Y is up, and heading is `(cos yaw, 0, −sin yaw)`. The nodes have already done that conversion. `scenarios/onboarding.json` stores an empty grid. The obstacles for `cargo run -- planning` are in `fixtures/planning`. The live obstacles arrive as LiDAR.
 
 `Grid::cell` gives you the column and row of a world point, or `None` if the point is off the map. Columns follow x, rows follow y, and the cell is stored at `row * width + column`. `set_occupied` writes 255 into one cell. `set_weight` writes a belief from 0 to 255, and 0 clears the cell. Both ignore a column or row that isn't on the map. `is_occupied` is true when the stored weight is at least the threshold. Pass `None` for 128. Pass `Some(100)` to treat a weight of 100 as occupied, which the default does not. Rust has no default arguments, so `None` is how you ask for 128. `center` is the middle of a cell. You'll want that later, when a planner has to turn cells back into points. None of these helpers decide which returns are obstacles.
 
@@ -59,7 +58,7 @@ Treat the open cells as places you can step, and pretend every step costs someth
 
 `Planner::plan` in `src/planning/algorithm.rs` gets the grid, where the car is, the goal, `clearance_m`, and `goal_tolerance_m`. Return the waypoints, or `None` if there's no way through. Right now it returns `None`. A path is a list of world points, starting near the car and ending near the goal. The last point has to land inside `goal_tolerance_m`.
 
-`Grid::blocked` is true for a cell whose weight is at least 128, and also for a column or row off the map. That is `is_occupied` with `None`. `Grid::clear` asks whether a circle around a point is empty. Pass `clearance_m` as that radius. `Grid::segment_clear` asks the same thing for the strip between two points, with the same radius. `Grid::center` turns a cell back into a point on the path. `clearance_m` comes from `VehicleSpec::clearance_m`: a circle around the rear axle big enough to cover the whole car no matter which way it points. On this starter car that circle is about 0.266 m, and every course uses a 0.2 m goal tolerance. Use the arguments. They already carry those numbers. A route that fits a point, and not the car, will clip a wall.
+`Grid::blocked` is true for a cell whose weight is at least 128, and also for a column or row off the map. That is `is_occupied` with `None`. `Grid::clear` asks whether a circle around a point is empty. Pass `clearance_m` as that radius. `Grid::segment_clear` asks the same thing for the strip between two points, with the same radius. `Grid::center` turns a cell back into a point on the path. `clearance_m` comes from `VehicleSpec::clearance_m`: a circle around the rear axle big enough to cover the whole car no matter which way it points. On this starter car that circle is about 0.263 m, and every course uses a 0.2 m goal tolerance. Use the arguments. They already carry those numbers. A route that fits a point, and not the car, will clip a wall.
 
 `planned_update` in `src/planning/node.rs` calls your planner and then `validate_path`. That check wants real numbers, a first point within two cell widths of the car, a last point close enough to the goal, and clearance on every point and on every segment between them. `None` from you becomes "no path." A path the checker rejects is an error, so build one it will take.
 
