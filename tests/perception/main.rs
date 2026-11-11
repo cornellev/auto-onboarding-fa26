@@ -6,7 +6,8 @@ use cev_onboarding::{
 #[test]
 #[ignore = "Student acceptance: implement Perception::update, then run cargo test --test perception -- --ignored"]
 fn rotated_mount_duplicate_hits_and_empty_scans() {
-    let course: Course = serde_json::from_str(include_str!("../../scenarios/empty.json")).unwrap();
+    let course: Course =
+        serde_json::from_str(include_str!("../../scenarios/onboarding.json")).unwrap();
     let mut observation: Observation =
         serde_json::from_str(include_str!("../../fixtures/perception/observation.json")).unwrap();
     let mut perception = Perception::new(course.grid);

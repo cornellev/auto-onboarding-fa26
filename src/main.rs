@@ -42,7 +42,7 @@ fn run() -> Result<()> {
     let mut args = env::args().skip(1);
     let mode = args.next().unwrap_or_else(|| "observe".into());
     if matches!(mode.as_str(), "--help" | "-h" | "help") {
-        println!("cargo run -- <setup|observe|perception|planning|controls|autonomous|drive-test|node|fixture-publish>\n  --scenario <empty|detour|blocked>  --fixture <file>  --path <file>\n  --server <http://localhost:3000>  --duration <seconds>\n  node <role> --run <id> | fixture-publish <role> [--run <id>]\n  --manual-nodes\nDefault: observe. See README.md for simulator setup.");
+        println!("cargo run -- <setup|observe|perception|planning|controls|autonomous|drive-test|node|fixture-publish>\n  --scenario <empty|detour|blocked>  planning maps only\n  --fixture <file>  --path <file>\n  --server <http://localhost:3000>  --duration <seconds>\n  node <role> --run <id> | fixture-publish <role> [--run <id>]\n  --manual-nodes\nLive runs launch the onboarding manifest. Default: observe. See README.md for simulator setup.");
         return Ok(());
     }
     let node_role = if mode == "node" || mode == "fixture-publish" {
@@ -55,10 +55,8 @@ fn run() -> Result<()> {
     };
     let mut run_id = None;
     let mut manual = false;
-    let (mut scenario, mut server) = (
-        "empty".to_string(),
-        env::var("CEV_SIM_SERVER").unwrap_or_else(|_| "http://localhost:3000".into()),
-    );
+    let mut scenario = None;
+    let mut server = env::var("CEV_SIM_SERVER").unwrap_or_else(|_| "http://localhost:3000".into());
     let (mut fixture, mut path_file, mut duration): (Option<String>, Option<String>, Option<f64>) =
         (None, None, None);
     while let Some(flag) = args.next() {
@@ -71,7 +69,7 @@ fn run() -> Result<()> {
             .ok_or_else(|| error(format!("Missing value for {flag}")))?;
         match flag.as_str() {
             "--run" => run_id = Some(value),
-            "--scenario" => scenario = value,
+            "--scenario" => scenario = Some(value),
             "--server" => server = value,
             "--fixture" => fixture = Some(value),
             "--path" => path_file = Some(value),
@@ -79,9 +77,18 @@ fn run() -> Result<()> {
             _ => return Err(error(format!("Unknown option {flag}; use --help"))),
         }
     }
-    if !matches!(scenario.as_str(), "empty" | "detour" | "blocked") {
-        return Err(error("Scenario must be empty, detour, or blocked"));
-    }
+    let scenario = if mode == "planning" {
+        match scenario.as_deref().unwrap_or("empty") {
+            name @ ("empty" | "detour" | "blocked") => name.to_string(),
+            _ => return Err(error("Scenario must be empty, detour, or blocked")),
+        }
+    } else if scenario.is_some() {
+        return Err(error(
+            "--scenario only selects a planning map. Live runs use the onboarding course.",
+        ));
+    } else {
+        String::new()
+    };
     if duration.is_some_and(|n| !n.is_finite() || n <= 0.0) {
         return Err(error("Duration must be finite and positive"));
     }
@@ -111,7 +118,7 @@ fn run() -> Result<()> {
             interrupted,
         );
     }
-    let mut course: Course = load(format!("scenarios/{scenario}.json"))?;
+    let mut course: Course = load("scenarios/onboarding.json")?;
     course.validate()?;
     if let Some(duration) = duration {
         course.timeout_s = duration.min(course.timeout_s);
@@ -185,11 +192,6 @@ fn run() -> Result<()> {
         "drive-test" => Mode::DriveTest,
         _ => return Err(error("Unknown mode; use --help")),
     };
-    if mode == Mode::Controls && scenario != "empty" {
-        return Err(error(
-            "Controls fixtures run on the empty course. Test obstacle avoidance with autonomous.",
-        ));
-    }
     let mode_name = match mode {
         Mode::Observe => "observe",
         Mode::Controls => "controls",
@@ -447,14 +449,10 @@ fn run() -> Result<()> {
     reporter.finish(&map, &path, course.goal)?;
     result?;
     finished?;
-    if scenario == "blocked" && mode == Mode::Autonomous {
-        if reporter.summary.termination_reason.as_deref() == Some("ego-collision") {
-            return Err(error(
-                "Blocked course hit an obstacle; inspect node-events.jsonl and view.svg",
-            ));
-        }
-    } else if matches!(mode, Mode::Autonomous | Mode::Controls) && !reporter.summary.goal_reached {
-        return Err(error("Goal not reached; inspect node-events.jsonl and implement the indicated wiring/algorithm"));
+    if matches!(mode, Mode::Autonomous | Mode::Controls) && !reporter.summary.goal_reached {
+        return Err(error(
+            "Goal not reached; inspect node-events.jsonl and implement the indicated wiring/algorithm",
+        ));
     }
     Ok(())
 }

@@ -50,15 +50,14 @@ Back in this checkout:
 cargo test --locked
 cargo run -- setup
 cargo run -- observe --duration 5
-cargo run -- observe --scenario detour --duration 5
 cargo run -- drive-test
 ```
 
-`setup` registers the message types and installs the courses. It leaves a course alone if you've already edited it. Run it again after you restart orchestrator, because that registration dies with the process. Importing the raw simulator bundle is not a substitute. It doesn't bring back the full course.
+`setup` registers the message types and checks that the simulator already has the run manifest named `onboarding`. It does not copy a world into the simulator. Run it again after you restart orchestrator, because that registration dies with the process.
 
-`observe` should show the timestamps moving and the sensor counts updating, while the car stays still. An empty scan on the empty course is normal. The detour course has obstacles, so you should see hits. `drive-test` creeps at no more than 0.1 m/s and 0.1 rad for one simulated second, then stops.
+`observe` should show the timestamps moving and the sensor counts updating, while the car stays still. The square has cones, so you should see hits. `drive-test` creeps at no more than 0.1 m/s and 0.1 rad for one simulated second, then stops.
 
-Every run gets new topic names and a fresh copy of your algorithm's state. Ctrl-C stops the run and writes the results. Connecting again doesn't resume the old run. Start a new one.
+Every run gets a new router id and a fresh copy of your algorithm's state. The simulator topics stay the ones on the `onboarding` manifest. Ctrl-C stops the run and writes the results. Connecting again doesn't resume the old run. Start a new one.
 
 ## Work on one piece
 
@@ -83,10 +82,10 @@ When you want the car in the loop:
 
 ```sh
 cargo run -- controls --path fixtures/controls/curve.json
-cargo run -- autonomous --scenario detour
+cargo run -- autonomous
 ```
 
-`autonomous` starts the three programs. Until the planning and controls loops are written, it tells you what's missing and the car stays stopped. On empty and detour, missing the goal exits with an error. On blocked, stopping without hitting the wall exits cleanly. Use `--duration 5`, or Ctrl-C, while you're still working.
+`autonomous` starts the three programs. Until the planning and controls loops are written, it tells you what's missing and the car stays stopped. Missing the goal exits with an error. Use `--duration 5`, or Ctrl-C, while you're still working.
 
 To start the three programs yourself, run `autonomous --manual-nodes`. It prints a run id and waits, paused, until all three are up:
 

@@ -32,7 +32,7 @@ fn offline_modes_work_before_student_algorithms() {
 }
 
 #[test]
-#[ignore = "Live simulator + orchestrator + imported bundles + one open page required; run with --test-threads=1"]
+#[ignore = "Live simulator + orchestrator + the onboarding manifest + one open page required; run with --test-threads=1"]
 fn browser_observation_drive_stop_and_fresh_run() {
     let observe = run(&["observe", "--duration", "2"]);
     assert_eq!(observe["traveled_m"], 0.0);
@@ -44,12 +44,10 @@ fn browser_observation_drive_stop_and_fresh_run() {
 
 #[test]
 #[ignore = "Student end-to-end acceptance; requires completed algorithms and a live browser; run with --test-threads=1"]
-fn student_navigation_reaches_empty_and_detour_without_scenario_failure() {
-    for scenario in ["empty", "detour"] {
-        let summary = run(&["autonomous", "--scenario", scenario]);
-        assert_eq!(summary["goal_reached"], true);
-        assert_ne!(summary["termination_reason"], "ego-collision");
-    }
+fn student_navigation_reaches_the_goal() {
+    let summary = run(&["autonomous"]);
+    assert_eq!(summary["goal_reached"], true);
+    assert_ne!(summary["termination_reason"], "ego-collision");
 }
 
 #[test]
@@ -67,13 +65,14 @@ fn student_follows_straight_and_gentle_curve() {
 }
 
 #[test]
-#[ignore = "Live safety test; requires one browser and installed courses; run with --test-threads=1"]
+#[ignore = "Live safety test; requires one browser and the onboarding manifest; run with --test-threads=1"]
 fn candidate_watchdog_stops_when_commands_stop() {
     use cev_onboarding::{
         runtime::hardware::VehicleIo, runtime::runner::Course, runtime::sim::Sim, shared::types::*,
     };
     use std::time::{Duration, Instant};
-    let course: Course = serde_json::from_str(include_str!("../scenarios/empty.json")).unwrap();
+    let course: Course =
+        serde_json::from_str(include_str!("../scenarios/onboarding.json")).unwrap();
     let server = std::env::var("CEV_SIM_SERVER").unwrap_or_else(|_| "http://localhost:3000".into());
     let mut sim = Sim::launch(&course, &server).unwrap();
     let next = |sim: &mut Sim| {
@@ -113,28 +112,4 @@ fn candidate_watchdog_stops_when_commands_stop() {
         "Watchdog failed to stop the candidate"
     );
     sim.finish().unwrap();
-}
-
-#[test]
-#[ignore = "Student integration acceptance for unreachable goals; requires live browser; run with --test-threads=1"]
-fn blocked_course_stays_stopped() {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_cev-onboarding"));
-    command.args(["autonomous", "--scenario", "blocked", "--duration", "3"]);
-    if let Ok(server) = std::env::var("CEV_SIM_SERVER") {
-        command.args(["--server", &server]);
-    }
-    let output = command.output().unwrap();
-    assert!(
-        !output.status.success(),
-        "An unreachable goal must not report success"
-    );
-    let text = String::from_utf8(output.stdout).unwrap();
-    let directory = text
-        .lines()
-        .find_map(|line| line.strip_prefix("Results: "))
-        .expect("Results directory");
-    let summary: Value =
-        serde_json::from_slice(&fs::read(format!("{directory}/summary.json")).unwrap()).unwrap();
-    assert_eq!(summary["goal_reached"], false);
-    assert!(summary["traveled_m"].as_f64().unwrap() < 0.01);
 }

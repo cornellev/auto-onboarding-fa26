@@ -3,8 +3,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Course {
-    pub manifest_id: String,
-    pub resolved_hash: String,
     pub goal: Point2,
     pub goal_tolerance_m: f64,
     pub timeout_s: f64,

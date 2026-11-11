@@ -5,7 +5,7 @@ use cev_onboarding::{
 };
 
 fn course() -> Course {
-    serde_json::from_str(include_str!("../scenarios/empty.json")).unwrap()
+    serde_json::from_str(include_str!("../scenarios/onboarding.json")).unwrap()
 }
 fn observation(time: u64) -> Observation {
     Observation {
@@ -26,16 +26,10 @@ fn observation(time: u64) -> Observation {
 
 #[test]
 fn fixtures_have_valid_contracts_and_do_not_claim_hardware_calibration() {
-    for json in [
-        include_str!("../scenarios/empty.json"),
-        include_str!("../scenarios/detour.json"),
-        include_str!("../scenarios/blocked.json"),
-    ] {
-        let course: Course = serde_json::from_str(json).unwrap();
-        course.validate().unwrap();
-        assert!(validate_hardware_spec(&course.vehicle).is_err());
-        assert_eq!(course.resolved_hash.len(), 64);
-    }
+    let course: Course =
+        serde_json::from_str(include_str!("../scenarios/onboarding.json")).unwrap();
+    course.validate().unwrap();
+    assert!(validate_hardware_spec(&course.vehicle).is_err());
     let obs = observation(123);
     assert_eq!(
         serde_json::from_str::<Observation>(&serde_json::to_string(&obs).unwrap()).unwrap(),

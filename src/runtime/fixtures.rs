@@ -28,7 +28,7 @@ pub fn publish(
     let run = run.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let io = Transport::connect(&run)?;
     let course: crate::runtime::runner::Course =
-        serde_json::from_str(include_str!("../../scenarios/empty.json"))?;
+        serde_json::from_str(include_str!("../../scenarios/onboarding.json"))?;
     let info = pb::RunInfo {
         header: Some(protocol::header(&run, 1, 0, "map")),
         schema_hash: protocol::fingerprint(),

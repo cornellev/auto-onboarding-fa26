@@ -12,142 +12,60 @@ use std::{
     time::{Duration, Instant},
 };
 
+const MANIFEST_ID: &str = "onboarding";
+
 /**
- * Installs missing course resources and verifies their definitions against the supplied bundles.
- * Restores the vehicle, environment, scenario, and run manifests needed by the importer.
+ * Checks that the simulator already has the saved onboarding run.
+ * Does not install or replace that run. The world lives in the simulator.
  * @param server The simulator server's base URL.
- * @return Ok(()) if all supplied courses are installed and verified, or an I/O, API, or mismatch error.
+ * @return Ok(()) if the manifest is present, or an error if the server or the manifest is missing.
  */
 pub fn setup(server: &str) -> Result<()> {
     simcontrol::Client::new(server)?;
+    onboarding_manifest(server)?;
+    println!("Run manifest {MANIFEST_ID} is installed");
+    Ok(())
+}
+
+/// The stored run document. A missing manifest is an error, not something this repo creates.
+fn onboarding_manifest(server: &str) -> Result<serde_json::Value> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .http_status_as_error(false)
         .max_redirects(0)
         .timeout_global(Some(Duration::from_secs(15)))
         .build()
         .into();
-    let request = |path: &str, body: Option<&serde_json::Value>| -> Result<serde_json::Value> {
-        let url = format!("{}/api/storage{path}", server.trim_end_matches('/'));
-        let mut response = if let Some(body) = body {
-            agent.post(&url).send_json(body)?
-        } else {
-            agent.get(&url).call()?
-        };
-        let status = response.status().as_u16();
-        if status == 404 && body.is_none() {
-            return Ok(serde_json::Value::Null);
-        }
-        let value: serde_json::Value = response.body_mut().read_json()?;
-        if status >= 400 {
-            return Err(crate::error(format!("Storage API {path}: {value}")));
-        }
-        Ok(value)
+    let url = format!(
+        "{}/api/storage/run-manifests/{MANIFEST_ID}",
+        server.trim_end_matches('/')
+    );
+    let mut response = agent.get(&url).call()?;
+    let status = response.status().as_u16();
+    if status == 404 {
+        return Err(crate::error(
+            "Run manifest onboarding is not installed in the simulator",
+        ));
+    }
+    let value: serde_json::Value = response.body_mut().read_json()?;
+    if status >= 400 {
+        return Err(crate::error(format!(
+            "Storage API /run-manifests/{MANIFEST_ID}: {value}"
+        )));
+    }
+    Ok(value)
+}
+
+fn topic<'a>(manifest: &'a serde_json::Value, id: &str) -> Result<&'a str> {
+    let topics = if manifest["topics"].is_array() {
+        &manifest["topics"]
+    } else {
+        &manifest["manifest"]["topics"]
     };
-    for name in ["empty", "detour", "blocked"] {
-        let bundle: serde_json::Value =
-            serde_json::from_slice(&std::fs::read(format!("scenarios/{name}.bundle.json"))?)?;
-        let course: Course =
-            serde_json::from_slice(&std::fs::read(format!("scenarios/{name}.json"))?)?;
-        course.validate()?;
-        for vehicle in bundle["resolved"]["vehicles"]
-            .as_array()
-            .ok_or_else(|| crate::error("Missing bundled vehicles"))?
-        {
-            let manifest = &vehicle["manifest"];
-            let id = manifest["id"]
-                .as_str()
-                .ok_or_else(|| crate::error("Missing vehicle ID"))?;
-            if request(&format!("/vehicles/{id}"), None)?.is_null() {
-                request("/vehicles", Some(manifest))?;
-            }
-        }
-        let environment = &bundle["resolved"]["environment"]["manifest"];
-        let id = environment["environmentId"]
-            .as_str()
-            .ok_or_else(|| crate::error("Missing environment ID"))?;
-        if request(&format!("/environments/{id}"), None)?.is_null() {
-            request(
-                "/environments",
-                Some(
-                    &serde_json::json!({"id":id,"name":environment["name"],"initialManifest":environment,"supportedEditorSourceVersions":[1]}),
-                ),
-            )?;
-        }
-        let scenario = &bundle["resolved"]["scenario"]["scenario"];
-        let id = scenario["id"]
-            .as_str()
-            .ok_or_else(|| crate::error("Missing scenario ID"))?;
-        if request(&format!("/scenarios/{id}"), None)?.is_null() {
-            request("/scenarios", Some(scenario))?;
-        }
-        let id = &course.manifest_id;
-        if request(&format!("/run-manifests/{id}"), None)?.is_null() {
-            request("/run-manifests", Some(&bundle["manifest"]))?;
-        }
-        let resolved = request(
-            &format!("/run-manifests/{id}/resolve"),
-            Some(&serde_json::json!({})),
-        )?;
-        verify_course(&resolved, &bundle, &course)?;
-        println!("Installed and verified {id}");
-    }
-    Ok(())
-}
-
-/**
- * Checks a resolved course against its supplied bundle without relying on portable timestamps.
- * @param resolved The simulator's resolved run manifest and dependency hashes.
- * @param bundle The supplied course bundle containing the expected definitions and hashes.
- * @param course The course configuration containing the expected original resolved hash.
- * @return The simulator's resolved hash, or an error if hashes differ or required data is missing.
- */
-fn verify_course(
-    resolved: &serde_json::Value,
-    bundle: &serde_json::Value,
-    course: &Course,
-) -> Result<String> {
-    // Imports rewrite timestamps in this simulator revision, so resolvedHash alone is not portable.
-    let source = &bundle["resolved"];
-    if source["resolvedHash"].as_str() != Some(&course.resolved_hash)
-        || resolved["definitionHash"] != source["definitionHash"]
-        || resolved["dependencyHashes"] != source["dependencyHashes"]
-        || resolved["definitionHash"].is_null()
-        || resolved["dependencyHashes"].is_null()
-    {
-        return Err(crate::error(format!("Course {} or its dependencies differ from the supplied bundle. Existing resources were not overwritten; use a fresh simulator data directory or rename edited resources.",course.manifest_id)));
-    }
-    resolved["resolvedHash"]
-        .as_str()
-        .map(str::to_string)
-        .ok_or_else(|| crate::error("Missing resolved run hash"))
-}
-
-/**
- * Loads a course bundle and asks the simulator to resolve and verify its run manifest.
- * @param server The simulator server's base URL.
- * @param course The course identifying the local bundle and installed run manifest.
- * @return The verified resolved hash, or a file, API, or course-verification error.
- */
-fn resolve_course(server: &str, course: &Course) -> Result<String> {
-    let bundle: serde_json::Value = serde_json::from_slice(&std::fs::read(format!(
-        "scenarios/{}.bundle.json",
-        course.manifest_id.trim_start_matches("onboarding-")
-    ))?)?;
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .max_redirects(0)
-        .timeout_global(Some(Duration::from_secs(15)))
-        .build()
-        .into();
-    let resolved: serde_json::Value = agent
-        .post(format!(
-            "{}/api/storage/run-manifests/{}/resolve",
-            server.trim_end_matches('/'),
-            course.manifest_id
-        ))
-        .send_json(serde_json::json!({}))?
-        .body_mut()
-        .read_json()?;
-    verify_course(&resolved, &bundle, course)
+    topics
+        .as_array()
+        .and_then(|topics| topics.iter().find(|topic| topic["id"].as_str() == Some(id)))
+        .and_then(|topic| topic["name"].as_str())
+        .ok_or_else(|| crate::error(format!("Run manifest onboarding is missing topic {id}")))
 }
 
 /**
@@ -306,8 +224,6 @@ pub struct Sim {
     pub run_id: String,
     pub info: pb::RunInfo,
     run: Option<simcontrol::Run>,
-    server: String,
-    manifest_id: String,
     state_sub: Subscription,
     scan_sub: Subscription,
     join: ObservationJoin,
@@ -334,8 +250,8 @@ impl Sim {
         Ok(sim)
     }
     /**
-     * Creates a unique run manifest, connects transport, and activates routing with the run paused.
-     * Requires one connected, stopped simulator browser and a verified installed course.
+     * Launches the saved onboarding manifest, connects transport, and activates routing with the run paused.
+     * Requires one connected, stopped simulator browser. Does not copy or delete that manifest.
      * @param course The course configuration and vehicle specification to validate.
      * @param server The simulator server's base URL.
      * @param mode The run mode recorded in RunInfo, such as observe, controls, or drive-test.
@@ -361,41 +277,21 @@ impl Sim {
             Err(err) => return Err(err.into()),
         };
         let browser = single_browser(&tabs)?;
-        resolve_course(server, course)?;
+        let manifest = onboarding_manifest(server)?;
         let run_id = uuid::Uuid::new_v4().to_string();
-        let manifest_id = format!("onboarding-run-{run_id}");
-        let bundle: serde_json::Value = serde_json::from_slice(&std::fs::read(format!(
-            "scenarios/{}.bundle.json",
-            course.manifest_id.trim_start_matches("onboarding-")
-        ))?)?;
-        let mut manifest = bundle["manifest"].clone();
-        manifest["id"] = serde_json::json!(manifest_id);
-        for topic in manifest["topics"]
-            .as_array_mut()
-            .ok_or_else(|| crate::error("Missing course topics"))?
-        {
-            let name = topic["name"]
-                .as_str()
-                .ok_or_else(|| crate::error("Missing topic name"))?;
-            topic["name"] = serde_json::json!(format!(
-                "/onboarding/{run_id}/{}",
-                name.trim_start_matches('/')
-            ));
-        }
-        request(
-            "POST",
-            &format!("{server}/api/storage/run-manifests"),
-            Some(&manifest),
-        )?;
+        let server = server.trim_end_matches('/');
         let resolved = request(
             "POST",
-            &format!("{server}/api/storage/run-manifests/{manifest_id}/resolve"),
+            &format!("{server}/api/storage/run-manifests/{MANIFEST_ID}/resolve"),
             Some(&serde_json::json!({})),
         )?;
         let expected = resolved["resolvedHash"]
             .as_str()
             .ok_or_else(|| crate::error("Missing derived run hash"))?
             .to_string();
+        let tf_topic = topic(&manifest, "tf")?;
+        let lidar_topic = topic(&manifest, "front-lidar-points")?;
+        let command_topic = topic(&manifest, "controls-command")?;
         let transport = Transport::connect(&run_id)?;
         let state_sub = transport.subscribe("state", 32)?;
         let scan_sub = transport.subscribe("lidar", 8)?;
@@ -418,16 +314,13 @@ impl Sim {
         };
         let context = serde_json::json!({"run_id":run_id,"profile_id":"cev-onboarding-v1","fingerprint":protocol::fingerprint(),
             "mode":mode,"vehicle":course.vehicle,"run_info":info,
-            "tf_topic":format!("/onboarding/{run_id}/tf"),"lidar_topic":format!("/onboarding/{run_id}/sensors/front_lidar/points"),
-            "command_topic":format!("/onboarding/{run_id}/controls/command")});
+            "tf_topic":tf_topic,"lidar_topic":lidar_topic,"command_topic":command_topic});
         api("POST", "/api/protobuf/runs", Some(&context))?;
         let mut sim = Self {
             transport,
             run_id,
             info,
             run: None,
-            server: server.into(),
-            manifest_id,
             state_sub,
             scan_sub,
             join: ObservationJoin::new(),
@@ -441,7 +334,7 @@ impl Sim {
             done: false,
             last_monitor: Instant::now(),
         };
-        let mut config = simcontrol::RunConfig::new(&sim.manifest_id);
+        let mut config = simcontrol::RunConfig::new(MANIFEST_ID);
         config.browser_id = Some(browser.clone());
         config.autoplay = false;
         sim.run = Some(match client.launch(config.clone()) {
@@ -532,8 +425,9 @@ impl Sim {
             .snapshot)
     }
     /**
-     * Sends STOP, removes routing, stops the browser run, and deletes its temporary manifest.
-     * @return The final simulator snapshot, or an error from any shutdown or cleanup step.
+     * Sends STOP, removes routing, and stops the browser run.
+     * Leaves the saved onboarding manifest in place.
+     * @return The final simulator snapshot, or an error from any shutdown step.
      */
     pub fn finish(&mut self) -> Result<simcontrol::Snapshot> {
         self.stop()?;
@@ -548,14 +442,6 @@ impl Sim {
             .ok_or_else(|| crate::error("No browser run"))?
             .stop()?;
         self.done = true;
-        request(
-            "DELETE",
-            &format!(
-                "{}/api/storage/run-manifests/{}",
-                self.server, self.manifest_id
-            ),
-            None,
-        )?;
         Ok(snapshot)
     }
 }
@@ -654,8 +540,9 @@ impl VehicleIo for Sim {
 }
 impl Drop for Sim {
     /**
-     * Attempts to remove routing, stop the browser run, and delete its temporary manifest.
+     * Attempts to remove routing and stop the browser run.
      * Skips cleanup after finish has marked the run done and ignores cleanup errors.
+     * Does not delete the saved onboarding manifest.
      */
     fn drop(&mut self) {
         if !self.done {
@@ -669,14 +556,6 @@ impl Drop for Sim {
                     let _ = run.stop();
                 }
             }
-            let _ = request(
-                "DELETE",
-                &format!(
-                    "{}/api/storage/run-manifests/{}",
-                    self.server, self.manifest_id
-                ),
-                None,
-            );
         }
     }
 }

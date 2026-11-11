@@ -33,7 +33,7 @@ A LiDAR point starts where the sensor is looking: x forward, y to the left, in m
 
 `Perception` in `src/perception/algorithm.rs` holds the map. `update` is handed an `Observation`, which is the pose, the scan points, and the sensor mount, and it should return `Some(&self.map)` once you have a map. Right now it returns `None`, which is why the car never moves. The runner builds an empty grid and passes it to `Perception::new`. A new cell is 0, and 0 is free. That's reasonable on these courses, where the obstacles sit still and the car can see them. It would be a bad assumption on a course the car hasn't fully looked at.
 
-The browser's vehicle origin is `base_link`. `rear_axle_in_base.x` is −0.1 m, so a base_link pose at x = 1.1 is the planning fixture's start at x = 1.0, and the bundle's finish waypoint at x = 8.1 is the course goal `(8, 0)`. The pose you receive is already the rear axle, with +x forward and +y left. The bundle itself is a different frame: Y is up, and heading is `(cos yaw, 0, −sin yaw)`. The nodes have already done that conversion. `scenarios/detour.json` and `scenarios/blocked.json` store an empty grid. The obstacles for `cargo run -- planning` are in `fixtures/planning`. The live obstacle arrives as LiDAR.
+The browser's vehicle origin is `base_link`. `rear_axle_in_base.x` is −0.1 m, so the onboarding spawn — a base_link near `(1.57, −1.59)` in the simulator, facing −x — is the planning start `(1.67, 1.59)`. The red marker is the course goal `(−1.65, −0.93)`. The pose you receive is already the rear axle, with +x forward and +y left. The simulator frame is different: Y is up, and heading is `(cos yaw, 0, −sin yaw)`. The nodes have already done that conversion. `scenarios/onboarding.json` stores an empty grid. The obstacles for `cargo run -- planning` are in `fixtures/planning`. The live cones arrive as LiDAR.
 
 `Grid::cell` gives you the column and row of a world point, or `None` if the point is off the map. Columns follow x, rows follow y, and the cell is stored at `row * width + column`. `set_occupied` writes 255 into one cell. `set_weight` writes a belief from 0 to 255, and 0 clears the cell. Both ignore a column or row that isn't on the map. `is_occupied` is true when the stored weight is at least the threshold. Pass `None` for 128. Pass `Some(100)` to treat a weight of 100 as occupied, which the default does not. Rust has no default arguments, so `None` is how you ask for 128. `center` is the middle of a cell. You'll want that later, when a planner has to turn cells back into points. None of these helpers decide which returns are obstacles.
 
@@ -47,7 +47,7 @@ cargo run -- perception --fixture fixtures/perception/observation.json
 cargo test --test perception -- --ignored
 ```
 
-The fixture is a small rotated pose with duplicate points, so you can check it by hand. Out in the open, an empty scan is normal, not a broken sensor. The detour course is where the hits show up. Try one point by hand, an empty scan, a hit off the map, the duplicate points, and then a live detour scan.
+The fixture is a small rotated pose with duplicate points, so you can check it by hand. Out in the open, an empty scan is normal, not a broken sensor. The live square has cones, so that scan is where the hits show up. Try one point by hand, an empty scan, a hit off the map, the duplicate points, and then a live scan.
 
 Once that's boring, the usual next steps are tracing rays to mark free space, storing a belief with `set_weight` instead of a hard 255, ignoring noise, or letting old obstacles fade.
 
@@ -130,12 +130,10 @@ Use `perception` or `controls` in place of `planning` to practice those. This pu
 Get each piece working on its own files before you combine them. Then:
 
 ```sh
-cargo run -- autonomous --scenario empty
-cargo run -- autonomous --scenario detour
-cargo run -- autonomous --scenario blocked
+cargo run -- autonomous
 ```
 
-`autonomous` starts all three programs. Until planning and controls are connected, it tells you what's missing and the car stays put. If the empty or detour run ends without reaching the goal, the command fails. The blocked course is the exception: stopping without an `ego-collision` exits 0, and hitting the wall exits with an error. While you're still working, use `--duration 5` or Ctrl-C. By the end, reach the goal on the empty course and the detour course, and stop on the blocked course.
+`autonomous` starts all three programs on the onboarding square. Until planning and controls are connected, it tells you what's missing and the car stays put. If the run ends without reaching the goal, the command fails. While you're still working, use `--duration 5` or Ctrl-C. By the end, reach the red marker. The planning maps are separate from that live run: empty is open, detour is a frozen copy of the cones, and blocked adds a wall across the map. Those three are `cargo run -- planning`, and blocked should come back with no path.
 
 Save a result from early on. Find one thing that's wrong, either in the files or in the browser's Analysis and Replay views, change it, and compare. The folder the command prints contains `node-events.jsonl`, `updates.csv`, `summary.json`, and `view.svg`. The CSV is seconds, meters, and radians, on the simulator's clock. In the picture, the path you asked for is blue and the path the car drove is orange. The same course is a fair comparison. The exact trace can still wobble, because the browser's timing isn't perfectly repeatable.
 
@@ -150,17 +148,17 @@ Most of the time it's one of these.
 - "Perception unavailable" means `update` is still empty. Start with the perception fixture.
 - "No path" means the planner is still empty, or the goal really is walled off. Try the empty planning map.
 - "Controller returned stop" means the controller is still the stub, or you told it to stop.
-- Zero laser points on the empty course is normal. Watch the detour course if you want hits.
+- Zero laser points can happen if nothing is in the beam. The onboarding square has cones, so a live scan should usually show hits.
 - A rotated or mirrored map usually means the transforms ran in the wrong order, or y got flipped. Sensor, then car, then world, and +y stays left.
 - A transposed map has x and y swapped in the grid. y picks the row, x picks the column.
 - A path through a wall checked the cells under the waypoints and skipped the line between them.
 - Steering away from the path means the sign is backwards. Positive steering is left. Try both directions on a short path.
 - "Command limited" means the numbers were real, and bigger than the car's speed or steering limit.
-- Updates slower than 300 ms stop the car. That watchdog is `FRESH_NS` in the Rust nodes and the same 300 ms in orchestrator's command adapter. Leave the bundle's 100 ms command `timeoutNs` and 200 ms `validityNs` as they are.
+- Updates slower than 300 ms stop the car. That watchdog is `FRESH_NS` in the Rust nodes and the same 300 ms in orchestrator's command adapter. Leave the run manifest's 100 ms command `timeoutNs` and 200 ms `validityNs` as they are.
 - "No connected simulator tab", "More than one connected simulator tab", and "The simulator tab still has a run going" are three different problems. Stop the run, and keep a single simulator tab.
 - "The process at … is not the simulator" means `--server` is some other program. Use the simulator from getting started. Another program on port 3000 produces this message.
 - "Start the router: zenohd -c config/zenoh-router.json5" means the local Zenoh router is not running.
-- A hash mismatch means the saved course disagrees with its sidecar. Run `setup` against a fresh simulator data directory. Don't edit the hash.
+- `setup` only checks that the simulator already has the run manifest named `onboarding`. It does not install a world. If that manifest is missing, create it in the simulator.
 - If you restart orchestrator after the page connected, refresh the page.
 - `simulator_passed: false` after the car reached the goal can mean the browser recorded the stop as an interruption. Check `goal_reached` and the termination reason in `summary.json`.
 
