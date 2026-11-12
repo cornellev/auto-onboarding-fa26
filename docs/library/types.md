@@ -50,6 +50,21 @@ let in_world = observation.state.pose.transform(in_vehicle);
 
 The first call uses the mount, whose translation is where the LiDAR is bolted relative to the rear axle. The second uses the car's pose in the world. The order is sensor, then car, then world.
 
+`Pose2::inverse_transform(self, point)`
+
+Undo `transform`. Subtract `position`, then rotate by the opposite heading. A world point becomes a point in this pose's frame. +x is still forward and +y is still left.
+
+With the same θ, and a world point `(x, y)`:
+
+```text
+dx = x - position.x
+dy = y - position.y
+x' = cos(θ) * dx + sin(θ) * dy
+y' = -sin(θ) * dx + cos(θ) * dy
+```
+
+`transform(inverse_transform(point))` and `inverse_transform(transform(point))` both return the point they started from, for a finite pose and a finite point. Controls uses this to bring a lookahead point from the world into the car. Positive `y` in that frame is a left turn.
+
 `Pose2::is_finite(self)`
 
 Return `true` when `position` is finite and `yaw_rad` is finite.
@@ -139,11 +154,15 @@ hypot(length_m / 2 + abs(rear_axle_in_base.x),
 
 Planning passes this radius to `Grid::clear` and `Grid::segment_clear`. On the starter car the value is about 0.263 m. The function does not look at the heading, so the circle is the same at every yaw.
 
+`VehicleSpec::require_finite(&self, command)`
+
+Return `Ok(())` when `speed_mps` and `steering_rad` are both finite. Return `"Non-finite command rejected; stopping"` when either is `NaN` or infinite. This does not look at the caps and does not change the command. `controlled_update` calls it, then publishes the numbers `Controller::command` returned.
+
 `VehicleSpec::limit(&self, command)`
 
 Clamp a finite command to the car. Speed is clamped to `0.0..=max_speed_mps`, so a negative speed becomes zero. Steering is clamped to `-max_steering_rad..=max_steering_rad`.
 
-Return an error, `"Non-finite command rejected; stopping"`, when `speed_mps` or `steering_rad` is `NaN` or infinite. The caller decides whether to publish the clamped command. `controlled_update` calls `limit` to reject a non-finite command, then publishes the numbers the controller returned. The runner calls `limit` again and records when the clamp changed them.
+Return the same non-finite error as `require_finite` when `speed_mps` or `steering_rad` is `NaN` or infinite. The runner and `Sim::drive` publish this clamped result. The controls node does not. The runner records a saturated update when the clamp would have changed the command the node published.
 
 ## See also
 

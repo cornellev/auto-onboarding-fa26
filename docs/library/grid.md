@@ -6,7 +6,7 @@ This module stores a map as a rectangle of cells. Columns follow world x. Rows f
 
 A fresh grid is all weight 0. The default cutoff treats a weight below 128 as free, so a new cell is free. That is a reasonable reading of these courses, where the obstacles sit still and the car can see them. The grid does not decide which LiDAR returns are obstacles. `Perception::update` does, and then calls `set_occupied` or `set_weight`.
 
-Off the map, the four lookups disagree on purpose. `cell` returns `None`. `set_weight` and `set_occupied` leave the storage alone. `is_occupied` is false, so a scan does not invent a hit outside the map. `blocked` is true, so a route cannot step outside.
+Off the map, the four lookups disagree on purpose. `cell` returns `None`. `set_weight` and `set_occupied` leave the storage alone. `is_occupied` is false, so a scan does not invent a hit outside the map. `blocked` is true, so a route cannot step outside. `blocked` is the occupancy cutoff, a weight of at least 128. It is not "the car fits here." A planner waypoint has to pass `clear` with the car's clearance, and a step has to pass `segment_clear`.
 
 The Protobuf `Grid` in [`messages`](messages.md) is a different type, with `u32` weights. `protocol::convert` copies between them. Planning and perception in this crate use the struct on this page.
 
@@ -101,7 +101,7 @@ Return `true` when the strip from `a` to `b`, thickened by `radius_m`, stays cle
 
 Let `distance` be `a.distance(b)`. Return `false` when that distance is not finite, which covers a non-finite endpoint. The number of steps is `ceil(distance / (resolution_m / 2))`, and at least 1. Return `false` when that count is greater than 100,000.
 
-Sample `count + 1` points from `a` to `b`, including both ends. Sample `i` is `(1 - t) * a + t * b` with `t = i / count`. Each sample is passed to `clear` with radius `radius_m + distance / count / 2`. The added term is half the gap between samples, so the circles overlap and cover the strip between them. One sample that fails `clear` fails the segment.
+Sample `count + 1` points from `a` to `b`, including both ends. Sample `i` is `(1 - t) * a + t * b` with `t = i / count`. Each sample is passed to `clear` with radius `radius_m + distance / count / 2`. The added term is half the gap between samples, so the circles overlap and cover the strip between them. That radius is larger than `radius_m`. Two endpoints that each pass `clear` at `radius_m` can still fail the segment. One sample that fails `clear` fails the segment.
 
 A path that only checks the cells under its waypoints can still cut a corner. `segment_clear` is the check for the line between two points. `validate_path` calls it for the step from the car to the first waypoint and for every step after that.
 

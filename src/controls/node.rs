@@ -71,8 +71,8 @@ pub fn controlled_update(
         return Err(crate::error("Invalid path points"));
     }
     let command = controller.command(&state, &points, dt_s);
-    // Reject a non-finite command. The number we publish is the one the controller asked for.
-    controller.vehicle.limit(command)?;
+    // The number we publish is the one the controller asked for. Clamping happens later.
+    controller.vehicle.require_finite(command)?;
     out.command = Some(protocol::convert(&command)?);
     out.source = Some(source.clone());
     out.path_sequence = path_h.sequence;

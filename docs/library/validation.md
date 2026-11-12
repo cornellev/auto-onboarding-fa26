@@ -28,7 +28,7 @@ The path checks run in order. The first failure is the error you get.
 
 A path of one point skips the last step, because there is no pair of waypoints. It still has to clear the point itself and the segment from the car to that point.
 
-`Grid::clear` and `Grid::segment_clear` treat a weight of 128 or more as blocked, and they treat a circle that leaves the map as blocked. A route that fits a point and does not fit the car fails here. A route that jumps a wall between waypoints fails on the segment, which is the usual shape of a path that only tested the cells under the points.
+`Grid::clear` and `Grid::segment_clear` treat a weight of 128 or more as blocked, and they treat a circle that leaves the map as blocked. The search has to call those two functions with the same radius. A path whose cells are only not `blocked` fails here. A route that fits a point and does not fit the car fails here. A route that jumps a wall between waypoints fails on the segment, which is the usual shape of a path that only tested the cells under the points.
 
 `Ok(())` means every check passed. The function does not modify the path or the grid.
 

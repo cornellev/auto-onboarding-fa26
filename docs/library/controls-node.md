@@ -34,7 +34,7 @@ The checks run in this order.
 
 Steps 1, 2, 4, and 5 are successful stops. Steps 3, 6, and 7 are errors.
 
-Otherwise call `controller.command` with the plain state, the points, and `dt_s`. Pass that command through `controller.vehicle.limit`. A non-finite speed or steering angle returns `"Non-finite command rejected; stopping"`. A finite command that sits outside the car's caps still returns `Ok` from `limit`. This helper publishes the original command, the numbers the controller asked for. The runner calls `limit` again and records a saturated update when the clamp would have changed them. The simulator clamps once more before the wheels move.
+Otherwise call `controller.command` with the plain state, the points, and `dt_s`. Pass that command through `controller.vehicle.require_finite`. A non-finite speed or steering angle returns `"Non-finite command rejected; stopping"`. A finite command that sits outside the car's caps still returns `Ok`. This helper publishes the original command, the numbers the controller asked for. It does not clamp. The runner calls `limit` and records a saturated update when the clamp would have changed them. The simulator clamps once more before the wheels move.
 
 On that success the message cites the path. `source` is the path's source header. `path_sequence` is the path header's sequence. `valid_until_ns` is `source.time_ns + FRESH_NS`. The path's own header time is not rewritten.
 
@@ -42,7 +42,7 @@ The helper does not decide that the car has arrived. The runner does, and it has
 
 ## See also
 
-- [`types`](types.md) — `DriveCommand` and `VehicleSpec::limit`
+- [`types`](types.md) — `DriveCommand`, `VehicleSpec::require_finite`, and `VehicleSpec::limit`
 - [`messages`](messages.md) — `CommandUpdate` and `Availability`
 - [`perception-node`](perception-node.md) — the loop to copy
 - [`context`](context.md) — the stop published when a controls context is dropped

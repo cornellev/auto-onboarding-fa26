@@ -11,8 +11,9 @@ impl Controller {
     }
 
     /// Speed and steering to follow `path`. Positive steering is a left turn.
-    /// `dt_s` is the time since the last call, in seconds. This starter always stops.
-    /// See Controls in `docs/project.md`.
+    /// The numbers you return already have to sit inside the car's speed and steering caps.
+    /// The node publishes them unchanged. `dt_s` is the time since the last call, in seconds.
+    /// This starter always stops. See Controls in `docs/project.md`.
     pub fn command(&mut self, _state: &VehicleState, _path: &[Point2], _dt_s: f64) -> DriveCommand {
         // Edit me...
         DriveCommand::STOP

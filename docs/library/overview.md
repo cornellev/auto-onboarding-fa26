@@ -16,14 +16,14 @@ A few files in the repository sit outside this manual. `src/perception/algorithm
 
 - [`types`](types.md) — Points, poses, scans, commands, and the car
   - `Point2` — a point in a plane, in meters. `distance` is the straight-line distance. `is_finite` reports that both coordinates are real numbers.
-  - `Pose2` — a position and a heading. `transform` rotates a point by the heading, then adds the position. `is_finite` checks the position and the heading.
+  - `Pose2` — a position and a heading. `transform` rotates a point by the heading, then adds the position. `inverse_transform` undoes that, taking a world point into the pose's frame. `is_finite` checks the position and the heading.
   - `wrap_angle` — fold an angle, in radians, into −π..π.
   - `VehicleState` — a pose and a forward speed, in meters per second.
   - `LidarScan` — endpoints in the sensor frame, and the pose of the sensor on the car.
   - `Observation` — one moment: a time, a `VehicleState`, and a `LidarScan`. `validate` rejects a pose, speed, mount, or point that is not a real number, and a scan with more than 100,000 points.
   - `Path` — a list of `Point2` waypoints.
   - `DriveCommand` — a forward speed and a steering angle. `DriveCommand::STOP` is zero speed and zero steering.
-  - `VehicleSpec` — the car's measurements and limits. `validate` checks that they are real and inside the starter caps. `clearance_m` is the circle around the rear axle that covers the car. `limit` clamps a finite command to those caps.
+  - `VehicleSpec` — the car's measurements and limits. `validate` checks that they are real and inside the starter caps. `clearance_m` is the circle around the rear axle that covers the car. `require_finite` rejects a command that is not a real number. `limit` clamps a finite command to those caps. The controls node calls `require_finite` and publishes the controller's numbers. The runner calls `limit`.
 - [`grid`](grid.md) — Occupancy grids
   - `Grid` — a rectangle of cells. Columns follow world x, rows follow world y, and cell `(col, row)` lives at `row * width + col`. Each cell holds a weight from 0 to 255.
   - `Grid::empty` — allocate a grid of weight 0. `Grid::validate` checks the origin, the resolution, and the storage.
@@ -89,5 +89,5 @@ A few files in the repository sit outside this manual. `src/perception/algorithm
 These structs are constructed for you. The bodies are yours, and the contract is in the [project writeup](../project.md). They are listed here so the boundary is visible.
 
 - `Perception::new` stores the grid the runner built. `Perception::update` turns one `Observation` into `Some(&self.map)`, or `None` when you do not have a map yet. The starter returns `None`.
-- `Planner::plan` returns the waypoints from the car to the goal, or `None` when there is no way through. The starter returns `None`.
-- `Controller::new` stores the `VehicleSpec`. `Controller::command` returns the speed and steering that follow a path. Positive steering is a left turn. The starter returns `DriveCommand::STOP`.
+- `Planner::plan` returns the waypoints from the car to the goal, or `None` when there is no way through. A waypoint has to pass `Grid::clear`, and a step has to pass `Grid::segment_clear`. `validate_path` errors when they do not. The starter returns `None`.
+- `Controller::new` stores the `VehicleSpec`. `Controller::command` returns the speed and steering that follow a path. Positive steering is a left turn. Those numbers already have to sit inside the car's caps. The starter returns `DriveCommand::STOP`.

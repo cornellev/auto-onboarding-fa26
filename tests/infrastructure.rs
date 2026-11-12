@@ -118,6 +118,19 @@ fn stop_defaults_nonfinite_rejection_and_command_limits() {
             steering_rad: f64::INFINITY
         })
         .is_err());
+    assert!(spec.require_finite(DriveCommand::STOP).is_ok());
+    assert!(spec
+        .require_finite(DriveCommand {
+            speed_mps: 10.0,
+            steering_rad: -5.0
+        })
+        .is_ok());
+    assert!(spec
+        .require_finite(DriveCommand {
+            speed_mps: f64::NAN,
+            steering_rad: 0.0
+        })
+        .is_err());
 }
 
 #[test]
@@ -165,6 +178,11 @@ fn transforms_and_metrics_use_segments() {
     let p = pose.transform(Point2 { x: 1.0, y: 0.0 });
     assert!((p.x - 1.0).abs() < 1e-10);
     assert!((p.y - 3.0).abs() < 1e-10);
+    let back = pose.inverse_transform(p);
+    assert!((back.x - 1.0).abs() < 1e-10 && back.y.abs() < 1e-10);
+    let world = Point2 { x: 4.0, y: -1.0 };
+    let round_trip = pose.transform(pose.inverse_transform(world));
+    assert!((round_trip.x - world.x).abs() < 1e-10 && (round_trip.y - world.y).abs() < 1e-10);
     assert_eq!(
         tracking_error(
             Point2 { x: 5.0, y: 1.0 },

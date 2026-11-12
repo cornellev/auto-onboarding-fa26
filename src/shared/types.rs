@@ -36,6 +36,18 @@ impl Pose2 {
         }
     }
 
+    /// Undo `transform`. Subtract this position, then rotate by the opposite heading.
+    /// A world point becomes a point in this pose's frame. +x is forward and +y is left.
+    pub fn inverse_transform(self, point: Point2) -> Point2 {
+        let dx = point.x - self.position.x;
+        let dy = point.y - self.position.y;
+        let (sin, cos) = self.yaw_rad.sin_cos();
+        Point2 {
+            x: cos * dx + sin * dy,
+            y: -sin * dx + cos * dy,
+        }
+    }
+
     pub fn is_finite(self) -> bool {
         self.position.is_finite() && self.yaw_rad.is_finite()
     }
@@ -144,12 +156,20 @@ impl VehicleSpec {
             .hypot(self.width_m / 2.0 + self.rear_axle_in_base.y.abs())
     }
 
-    /// Clamp speed to `0..=max_speed_mps` and steering to the car's limit.
-    /// Errors if either number isn't real. The caller decides whether to publish the clamped value.
-    pub fn limit(&self, command: DriveCommand) -> crate::Result<DriveCommand> {
+    /// Reject a command that is not a real number. This does not clamp.
+    /// `controlled_update` uses this, then publishes the numbers `command` returned.
+    pub fn require_finite(&self, command: DriveCommand) -> crate::Result<()> {
         if !command.speed_mps.is_finite() || !command.steering_rad.is_finite() {
             return Err(crate::error("Non-finite command rejected; stopping"));
         }
+        Ok(())
+    }
+
+    /// Clamp speed to `0..=max_speed_mps` and steering to the car's limit.
+    /// Errors if either number isn't real. The runner and the simulator publish this result.
+    /// The controls node does not.
+    pub fn limit(&self, command: DriveCommand) -> crate::Result<DriveCommand> {
+        self.require_finite(command)?;
         Ok(DriveCommand {
             speed_mps: command.speed_mps.clamp(0.0, self.max_speed_mps),
             steering_rad: command

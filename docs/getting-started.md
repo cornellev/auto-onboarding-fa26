@@ -59,6 +59,14 @@ cargo run -- observe --duration 5
 cargo run -- drive-test
 ```
 
+A green `cargo test --locked` means the starter builds. It does not mean perception, planning, or controls work. Those checks are:
+
+```sh
+cargo test --test perception -- --ignored
+cargo test --test planning -- --ignored
+cargo test --test controls -- --ignored
+```
+
 `setup` registers the message types and checks that the simulator already has the run manifest named `onboarding`. It does not copy a world into the simulator. Run it again after you restart orchestrator, because that registration dies with the process.
 
 `observe` should show the timestamps moving and the sensor counts updating, while the car stays still. The square has cones, so you should see hits. `drive-test` creeps at no more than 0.1 m/s and 0.1 rad for one simulated second, then stops.
@@ -83,7 +91,7 @@ cargo run -- fixture-publish planning --run planning-practice
 cargo run -- node planning --run planning-practice
 ```
 
-Swap `perception` or `controls` in for `planning` to practice those. A fixture runs for 60 seconds unless you pass `--duration`.
+Swap `perception` or `controls` in for `planning` to practice those. A fixture runs for 60 seconds unless you pass `--duration`. `cargo test --test wiring -- --ignored` only checks that a message was published. An unavailable map, "no path", and a stop all pass. The algorithm tests above are the ones that reject a stub.
 
 When you want the car in the loop:
 
@@ -108,11 +116,13 @@ cargo run -- node controls --run RUN_ID
 cargo fmt --check
 cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked
-cargo test --test wiring -- --ignored
+cargo test --test perception -- --ignored
 cargo test --test planning -- --ignored
+cargo test --test controls -- --ignored
+cargo test --test wiring -- --ignored
 ```
 
-`cargo test --locked` stays green before the algorithms exist and after they do. The wiring and algorithm tests stay ignored until you ask for them. With the router running, the wiring run accepts an unavailable map or a ready one, no path or a real path, and a stop or a real command. `three_processes` is part of that run. The perception, planning, and controls tests are the ones that want the real algorithms.
+`cargo test --locked` stays green before the algorithms exist and after they do. The wiring and algorithm tests stay ignored until you ask for them. With the router running, the wiring run accepts an unavailable map or a ready one, no path or a real path, and a stop or a real command. A pass there means a message was published, including what the stubs publish. `three_processes` is part of that run. The perception, planning, and controls tests are the ones that want the real algorithms.
 
 Make a branch, keep the change focused, run the fixture or test that covers it, and open a pull request that says what changed and what you saw. The command prints a result folder. Look at `node-events.jsonl`, `updates.csv`, `summary.json`, and `view.svg` in there, and use Analysis and Replay in the browser for the simulator's own view. The [project writeup](project.md) says what each part is asking for.
 
