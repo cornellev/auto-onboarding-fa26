@@ -20,6 +20,10 @@ Additionally, we'll be testing a bit of your understanding at the end of the sem
 
 GenAI is a very powerful tool that you can use to help you with your work, but you should be ultimately the architect and builder! There's a distinction between telling an AI agent to do something vs using it to build something. This project is small enough in scope that I'd limit it to explaining problems, trouble shooting, and minor code tweaks.
 
+### Library
+
+If you're confused about the code provided to you, you can look at the documentation in [the library](library/overview.md).
+
 ## Perception
 
 Where are the obstacles?

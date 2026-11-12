@@ -115,3 +115,5 @@ cargo test --test planning -- --ignored
 `cargo test --locked` stays green before the algorithms exist and after they do. The wiring and algorithm tests stay ignored until you ask for them. With the router running, the wiring run accepts an unavailable map or a ready one, no path or a real path, and a stop or a real command. `three_processes` is part of that run. The perception, planning, and controls tests are the ones that want the real algorithms.
 
 Make a branch, keep the change focused, run the fixture or test that covers it, and open a pull request that says what changed and what you saw. The command prints a result folder. Look at `node-events.jsonl`, `updates.csv`, `summary.json`, and `view.svg` in there, and use Analysis and Replay in the browser for the simulator's own view. The [project writeup](project.md) says what each part is asking for.
+
+If you're confused about the code provided to you, you can look at the documentation in [the library](library/overview.md).
