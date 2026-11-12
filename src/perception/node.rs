@@ -12,7 +12,6 @@ use prost::Message;
 use std::time::{Duration, Instant};
 use zenoh::{handlers::RingChannel, Wait};
 
-
 /// Subscribe to pose and LiDAR, pair the ones from the same moment, and publish a map.
 /// Stops if the input is nonsense, out of order, or older than the watchdog allows.
 pub fn run(mut ctx: Context) -> Result<()> {
@@ -22,14 +21,13 @@ pub fn run(mut ctx: Context) -> Result<()> {
         .declare_subscriber(ctx.transport.key("state"))
         .with(RingChannel::new(32))
         .wait()?;
-    
+
     let scans = ctx
         .transport
         .session
         .declare_subscriber(ctx.transport.key("lidar"))
         .with(RingChannel::new(8))
         .wait()?;
-
 
     let maps = ctx
         .transport
@@ -38,7 +36,6 @@ pub fn run(mut ctx: Context) -> Result<()> {
         .encoding(zenoh::bytes::Encoding::APPLICATION_PROTOBUF)
         .congestion_control(zenoh::qos::CongestionControl::Drop)
         .wait()?;
-
 
     let mut join = ObservationJoin::new();
     let (mut state_fresh, mut scan_fresh) = (Freshness::default(), Freshness::default());
