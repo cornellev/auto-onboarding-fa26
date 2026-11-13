@@ -6,7 +6,7 @@ That breaks into three questions. How does the car tell where the obstacles are?
 
 The code you already have compiles, talks to the simulator, and holds the car still. The three empty functions are yours: `Perception::update`, `Planner::plan`, and `Controller::command`.
 
-If the tools aren't installed, do [getting started](getting-started.md) first. Remember to look at the project timeline posted in Discord. Just as a reminder, we'll be done with this project by **December 6** - at these sessions, you'll be sharing your code, not just your results.
+If the tools aren't installed, do [getting started](getting-started.md) first. The simulator is coming this weekend. Until then, `cargo run -- perception` writes `view.svg` from a saved scan. Remember to look at the project timeline posted in Discord. Just as a reminder, we'll be done with this project by **December 6** - at these sessions, you'll be sharing your code, not just your results.
 
 ## Your plan
 
@@ -36,7 +36,7 @@ A LiDAR point starts where the sensor is looking: x forward, y to the left, in m
 
 `Perception` in `src/perception/algorithm.rs` holds the map. `update` is handed an `Observation`, which is the pose, the scan points, and the sensor mount, and it should return `Some(&self.map)` once you have a map. Right now it returns `None`, which is why the car never moves. The runner builds an empty grid and passes it to `Perception::new`. A new cell is 0, and 0 is free. That's reasonable on these courses, where the obstacles sit still and the car can see them. It would be a bad assumption on a course the car hasn't fully looked at.
 
-The browser's vehicle origin is `base_link`. `rear_axle_in_base.x` is −0.093454 m, so the onboarding spawn — a base_link near `(1.57, −1.59)` in the simulator, facing −x — is the planning start `(1.663454, 1.59)`. The red marker is the course goal `(−1.65, −0.93)`. The pose you receive is already the rear axle, with +x forward and +y left. The simulator frame is different: Y is up, and heading is `(cos yaw, 0, −sin yaw)`. The nodes have already done that conversion. `scenarios/onboarding.json` stores an empty grid. The obstacles for `cargo run -- planning` are in `fixtures/planning`. The live obstacles arrive as LiDAR.
+The browser's vehicle origin is `base_link`. `rear_axle_in_base.x` is −0.093454 m, so the onboarding spawn — a base_link near `(2.64, 0, −2.89)` in the simulator, facing −x — is the planning start `(2.733454, 2.89)`. The red marker is the course goal `(−1.65, −0.93)`. The pose you receive is already the rear axle, with +x forward and +y left. The simulator frame is different: Y is up, and heading is `(cos yaw, 0, −sin yaw)`. The nodes have already done that conversion. `scenarios/onboarding.json` stores an empty grid. The obstacles for `cargo run -- planning` are in `fixtures/planning`. The live obstacles arrive as LiDAR.
 
 `Grid::cell` gives you the column and row of a world point, or `None` if the point is off the map. Columns follow x, rows follow y, and the cell is stored at `row * width + column`. `set_occupied` writes 255 into one cell. `set_weight` writes a belief from 0 to 255, and 0 clears the cell. Both ignore a column or row that isn't on the map. `is_occupied` is true when the stored weight is at least the threshold. Pass `None` for 128. Pass `Some(100)` to treat a weight of 100 as occupied, which the default does not. Rust has no default arguments, so `None` is how you ask for 128. `center` is the middle of a cell. You'll want that later, when a planner has to turn cells back into points. None of these helpers decide which returns are obstacles.
 
@@ -50,7 +50,7 @@ cargo run -- perception --fixture fixtures/perception/observation.json
 cargo test --test perception -- --ignored
 ```
 
-The fixture is a small rotated pose with duplicate points, so you can check it by hand. Out in the open, an empty scan is normal, not a broken sensor. The live square has cones, so that scan is where the hits show up. Try one point by hand, an empty scan, a hit off the map, the duplicate points, and then a live scan.
+The command writes `results/perception-<timestamp>/view.svg`. Open it in a browser. Occupied cells are black. The fixture is a small rotated pose with duplicate points, so you can check it by hand. Out in the open, an empty scan is normal, not a broken sensor. The live square has cones, so that scan is where the hits show up. Try one point by hand, an empty scan, a hit off the map, the duplicate points, and then a live scan.
 
 Once that's boring, the usual next steps are tracing rays to mark free space, storing a belief with `set_weight` instead of a hard 255, ignoring noise, or letting old obstacles fade.
 
@@ -128,6 +128,8 @@ The pose you get is already the middle of the rear axle. Take the wheelbase from
 
 ## Connecting the pieces
 
+The router commands in this section arrive with the simulator this weekend. Until then, use `cargo run -- perception`.
+
 One scan takes this trip:
 
 1. The simulator tells orchestrator where the car is and what the laser sees.
@@ -161,7 +163,7 @@ Use `perception` or `controls` in place of `planning` to practice those. This pu
 
 ## Showing your work
 
-Get each piece working on its own files before you combine them. Then:
+Get each piece working on its own files before you combine them. `cargo run -- autonomous` arrives with the simulator this weekend. Until then, show the perception fixture, and the planning scenarios when you get there.
 
 ```sh
 cargo run -- autonomous
@@ -177,7 +179,7 @@ By December 6, the basic version should drive a simple course, with your own cod
 
 ## If the car just sits there
 
-Most of the time it's one of these.
+The simulator notes below arrive with this weekend's install. Most of the time it's one of these.
 
 - "Perception unavailable" means `update` is still empty. Start with the perception fixture.
 - "No path" means the planner is still empty, or the goal really is walled off. Try the empty planning map.

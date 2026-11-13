@@ -251,7 +251,7 @@ impl Sim {
     }
     /**
      * Launches the saved onboarding manifest, connects transport, and activates routing with the run paused.
-     * Requires one connected, stopped simulator browser. Does not copy or delete that manifest.
+     * Requires one connected, stopped simulator browser. Does not delete the saved manifest.
      * @param course The course configuration and vehicle specification to validate.
      * @param server The simulator server's base URL.
      * @param mode The run mode recorded in RunInfo, such as observe, controls, or drive-test.
@@ -280,6 +280,9 @@ impl Sim {
         let manifest = onboarding_manifest(server)?;
         let run_id = uuid::Uuid::new_v4().to_string();
         let server = server.trim_end_matches('/');
+        let tf_topic = topic(&manifest, "tf")?.to_string();
+        let lidar_topic = topic(&manifest, "front-lidar-points")?.to_string();
+        let command_topic = topic(&manifest, "controls-command")?.to_string();
         let resolved = request(
             "POST",
             &format!("{server}/api/storage/run-manifests/{MANIFEST_ID}/resolve"),
@@ -289,9 +292,6 @@ impl Sim {
             .as_str()
             .ok_or_else(|| crate::error("Missing derived run hash"))?
             .to_string();
-        let tf_topic = topic(&manifest, "tf")?;
-        let lidar_topic = topic(&manifest, "front-lidar-points")?;
-        let command_topic = topic(&manifest, "controls-command")?;
         let transport = Transport::connect(&run_id)?;
         let state_sub = transport.subscribe("state", 32)?;
         let scan_sub = transport.subscribe("lidar", 8)?;
@@ -313,7 +313,7 @@ impl Sim {
             },
         };
         let context = serde_json::json!({"run_id":run_id,"profile_id":"cev-onboarding-v1","fingerprint":protocol::fingerprint(),
-            "mode":mode,"vehicle":course.vehicle,"run_info":info,
+            "mode":mode,"vehicle":serde_json::to_value(&course.vehicle)?,"run_info":info,
             "tf_topic":tf_topic,"lidar_topic":lidar_topic,"command_topic":command_topic});
         api("POST", "/api/protobuf/runs", Some(&context))?;
         let mut sim = Self {

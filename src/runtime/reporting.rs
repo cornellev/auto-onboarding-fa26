@@ -175,7 +175,7 @@ impl Reporter {
             self.summary
                 .collisions
                 .map(|n| n.to_string())
-                .unwrap_or_else(|| "unavailable; inspect simulator results/Replay".into()),
+                .unwrap_or_else(|| "unavailable".into()),
             self.directory.display()
         );
         Ok(())

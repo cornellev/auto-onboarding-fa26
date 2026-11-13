@@ -40,9 +40,9 @@ fn load<T: serde::de::DeserializeOwned>(path: impl AsRef<std::path::Path>) -> Re
 
 fn run() -> Result<()> {
     let mut args = env::args().skip(1);
-    let mode = args.next().unwrap_or_else(|| "observe".into());
+    let mode = args.next().unwrap_or_else(|| "perception".into());
     if matches!(mode.as_str(), "--help" | "-h" | "help") {
-        println!("cargo run -- <setup|observe|perception|planning|controls|autonomous|drive-test|node|fixture-publish>\n  --scenario <empty|detour|blocked>  planning maps only\n  --fixture <file>  --path <file>\n  --server <http://localhost:3000>  --duration <seconds>\n  node <role> --run <id> | fixture-publish <role> [--run <id>]\n  --manual-nodes\nLive runs launch the onboarding manifest. Default: observe. See README.md for simulator setup.");
+        println!("cargo run -- <setup|observe|perception|planning|controls|autonomous|drive-test|node|fixture-publish>\n  --scenario <empty|detour|blocked>  planning maps only\n  --fixture <file>  --path <file>\n  --server <http://localhost:3000>  --duration <seconds>\n  node <role> --run <id> | fixture-publish <role> [--run <id>]\n  --manual-nodes\nLive runs launch the onboarding manifest. Default: perception. The simulator arrives this weekend.");
         return Ok(());
     }
     let node_role = if mode == "node" || mode == "fixture-publish" {

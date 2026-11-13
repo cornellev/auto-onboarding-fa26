@@ -38,7 +38,7 @@ The mean of the tracking errors on rows that had a path. `None` when no row had 
 
 `collisions`
 
-Unused by this module. The program does not fill it in. `finish` prints it as unavailable and points at the simulator's Replay view.
+Unused by this module. The program does not fill it in. `finish` prints it as `unavailable`.
 
 `simulator_passed`, `termination_reason`
 
@@ -88,7 +88,7 @@ Append the position to `trajectory`, add the step from the previous position to 
 
 `Reporter::finish(&mut self, map, path, goal)`
 
-Flush the CSV, write `summary.json` as pretty JSON with a trailing newline, and write `view.svg` by calling `write_svg`. Print the status, the goal distance in meters to two places or `unavailable`, the collision count or the Replay hint, and the directory path.
+Flush the CSV, write `summary.json` as pretty JSON with a trailing newline, and write `view.svg` by calling `write_svg`. Print the status, the goal distance in meters to two places or `unavailable`, the collision count or `unavailable`, and the directory path.
 
 Return a grid error from `write_svg` if `map` fails `validate`, or an I/O or JSON error if a file cannot be written. The print happens after both files are written.
 

@@ -29,6 +29,31 @@ fn fixtures_have_valid_contracts_and_do_not_claim_hardware_calibration() {
     let course: Course =
         serde_json::from_str(include_str!("../scenarios/onboarding.json")).unwrap();
     course.validate().unwrap();
+    let axle = Point2 {
+        x: 2.733454,
+        y: 2.89,
+    };
+    let radius = course.vehicle.clearance_m();
+    validate_path(
+        &course.grid,
+        &course.control_path,
+        axle,
+        course.goal,
+        radius,
+        course.goal_tolerance_m,
+    )
+    .unwrap();
+    let curve: Path =
+        serde_json::from_str(include_str!("../fixtures/controls/curve.json")).unwrap();
+    validate_path(
+        &course.grid,
+        &curve,
+        axle,
+        course.goal,
+        radius,
+        course.goal_tolerance_m,
+    )
+    .unwrap();
     assert!(validate_hardware_spec(&course.vehicle).is_err());
     let obs = observation(123);
     assert_eq!(
