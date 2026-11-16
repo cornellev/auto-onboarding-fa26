@@ -5,7 +5,7 @@ use cev_onboarding::{
 };
 
 fn course() -> Course {
-    serde_json::from_str(include_str!("../scenarios/empty.json")).unwrap()
+    serde_json::from_str(include_str!("../scenarios/onboarding.json")).unwrap()
 }
 fn observation(time: u64) -> Observation {
     Observation {
@@ -26,16 +26,35 @@ fn observation(time: u64) -> Observation {
 
 #[test]
 fn fixtures_have_valid_contracts_and_do_not_claim_hardware_calibration() {
-    for json in [
-        include_str!("../scenarios/empty.json"),
-        include_str!("../scenarios/detour.json"),
-        include_str!("../scenarios/blocked.json"),
-    ] {
-        let course: Course = serde_json::from_str(json).unwrap();
-        course.validate().unwrap();
-        assert!(validate_hardware_spec(&course.vehicle).is_err());
-        assert_eq!(course.resolved_hash.len(), 64);
-    }
+    let course: Course =
+        serde_json::from_str(include_str!("../scenarios/onboarding.json")).unwrap();
+    course.validate().unwrap();
+    let axle = Point2 {
+        x: 2.733454,
+        y: 2.89,
+    };
+    let radius = course.vehicle.clearance_m();
+    validate_path(
+        &course.grid,
+        &course.control_path,
+        axle,
+        course.goal,
+        radius,
+        course.goal_tolerance_m,
+    )
+    .unwrap();
+    let curve: Path =
+        serde_json::from_str(include_str!("../fixtures/controls/curve.json")).unwrap();
+    validate_path(
+        &course.grid,
+        &curve,
+        axle,
+        course.goal,
+        radius,
+        course.goal_tolerance_m,
+    )
+    .unwrap();
+    assert!(validate_hardware_spec(&course.vehicle).is_err());
     let obs = observation(123);
     assert_eq!(
         serde_json::from_str::<Observation>(&serde_json::to_string(&obs).unwrap()).unwrap(),
@@ -57,10 +76,15 @@ fn grid_indexing_edges_and_clearance_use_whole_cells() {
         None
     );
     assert!(grid.blocked(20, 0));
-    grid.set_occupied(10, 10, true);
+    grid.set_occupied(10, 10);
     assert!(!grid.clear(Point2 { x: 0.11, y: 0.05 }, 0.02));
     assert!(grid.clear(Point2 { x: 0.3, y: 0.3 }, 0.05));
     assert!(!grid.segment_clear(Point2 { x: -0.5, y: 0.05 }, Point2 { x: 0.5, y: 0.05 }, 0.0));
+    assert_eq!(grid.weights[10 * grid.width + 10], 255);
+    grid.set_weight(11, 11, 100);
+    assert!(!grid.is_occupied(11, 11, None));
+    assert!(grid.is_occupied(11, 11, Some(100)));
+    assert!(!grid.is_occupied(20, 0, None));
     assert!(Grid::empty(Point2::default(), 0.0, 2, 2).is_err());
     assert!(Grid::empty(Point2::default(), 0.1, usize::MAX, usize::MAX).is_err());
 }
@@ -70,8 +94,9 @@ fn path_validator_catches_collisions_between_waypoints_and_bad_endpoints() {
     let mut map = Grid::empty(Point2::default(), 0.1, 50, 50).unwrap();
     let (start, goal) = (Point2 { x: 1.0, y: 1.0 }, Point2 { x: 4.0, y: 1.0 });
     validate_path(&map, &[start, goal], start, goal, 0.1, 0.2).unwrap();
-    map.set_occupied(25, 10, true);
-    assert!(validate_path(&map, &[start, goal], start, goal, 0.1, 0.2).is_err());
+    map.set_occupied(25, 10);
+    let blocked = validate_path(&map, &[start, goal], start, goal, 0.1, 0.2).unwrap_err();
+    assert!(blocked.to_string().contains("segment"), "{blocked}");
     assert!(validate_path(&map, &[], start, goal, 0.1, 0.2).is_err());
     assert!(validate_path(
         &map,
@@ -102,8 +127,8 @@ fn stop_defaults_nonfinite_rejection_and_command_limits() {
         })
         .unwrap(),
         DriveCommand {
-            speed_mps: 0.3,
-            steering_rad: -0.5
+            speed_mps: 1.0,
+            steering_rad: -0.349066
         }
     );
     assert!(spec
@@ -118,17 +143,51 @@ fn stop_defaults_nonfinite_rejection_and_command_limits() {
             steering_rad: f64::INFINITY
         })
         .is_err());
+    assert!(spec.require_finite(DriveCommand::STOP).is_ok());
+    assert!(spec
+        .require_finite(DriveCommand {
+            speed_mps: 10.0,
+            steering_rad: -5.0
+        })
+        .is_ok());
+    assert!(spec
+        .require_finite(DriveCommand {
+            speed_mps: f64::NAN,
+            steering_rad: 0.0
+        })
+        .is_err());
 }
 
 #[test]
-fn unfinished_algorithms_are_safe_and_independent() {
-    use cev_onboarding::{controls::Controller, perception::Perception, planning::Planner};
+fn algorithms_stay_safe_before_and_after_implementation() {
+    use cev_onboarding::{
+        controls::Controller, perception::Perception, planning::validation::validate_path,
+        planning::Planner,
+    };
     let course = course();
     let obs = observation(100_000_000);
-    assert!(Perception::new(course.grid.clone()).update(&obs).is_none());
-    assert!(Planner::default()
-        .plan(&course.grid, &obs.state, course.goal)
-        .is_none());
+    let mut perception = Perception::new(course.grid.clone());
+    if let Some(map) = perception.update(&obs) {
+        map.validate().unwrap();
+    }
+    let mut planner = Planner::default();
+    if let Some(path) = planner.plan(
+        &course.grid,
+        &obs.state,
+        course.goal,
+        course.vehicle.clearance_m(),
+        course.goal_tolerance_m,
+    ) {
+        validate_path(
+            &course.grid,
+            &path,
+            obs.state.pose.position,
+            course.goal,
+            course.vehicle.clearance_m(),
+            course.goal_tolerance_m,
+        )
+        .unwrap();
+    }
     assert_eq!(
         Controller::new(course.vehicle).command(&obs.state, &[], 0.1),
         DriveCommand::STOP
@@ -144,6 +203,11 @@ fn transforms_and_metrics_use_segments() {
     let p = pose.transform(Point2 { x: 1.0, y: 0.0 });
     assert!((p.x - 1.0).abs() < 1e-10);
     assert!((p.y - 3.0).abs() < 1e-10);
+    let back = pose.inverse_transform(p);
+    assert!((back.x - 1.0).abs() < 1e-10 && back.y.abs() < 1e-10);
+    let world = Point2 { x: 4.0, y: -1.0 };
+    let round_trip = pose.transform(pose.inverse_transform(world));
+    assert!((round_trip.x - world.x).abs() < 1e-10 && (round_trip.y - world.y).abs() < 1e-10);
     assert_eq!(
         tracking_error(
             Point2 { x: 5.0, y: 1.0 },

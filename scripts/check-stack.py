@@ -28,7 +28,8 @@ def main():
             processes.append(proc)
             return proc
         def wait_port(number,proc):
-            deadline=time.monotonic()+15
+            # shortcut: orchestrator zenoh.open still leaves shared memory on; if macOS still times out, disable it in cornellev/orchestrator and bump orchestrator_ref
+            deadline=time.monotonic()+45
             while time.monotonic()<deadline:
                 if proc.poll() is not None:raise RuntimeError('Service exited during startup')
                 try:
@@ -38,7 +39,8 @@ def main():
         try:
             config=temp/'router.json5'
             config.write_text(json.dumps({'mode':'router','listen':{'endpoints':[f'tcp/127.0.0.1:{router_port}']},
-                'scouting':{'multicast':{'enabled':False},'gossip':{'enabled':False}},'plugins_loading':{'enabled':False}}))
+                'scouting':{'multicast':{'enabled':False},'gossip':{'enabled':False}},'plugins_loading':{'enabled':False},
+                'transport':{'shared_memory':{'enabled':False}}}))
             router=start([str(Path(args.router).resolve()),'-c',str(config)],root,'router')
             wait_port(router_port,router)
             orch=start([sys.executable,'-u','main.py','--zenoh-profile','interop','--zenoh-connect',env['CEV_ZENOH_ENDPOINT']],args.orchestrator,'orchestrator')

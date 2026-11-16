@@ -1,4 +1,4 @@
-//! Maintainer-owned boundary. Implement this on the Pi; no desktop GPIO dependencies.
+//! What the Pi has to implement before this can run on a real car. The laptop starter doesn't include it.
 use crate::{
     shared::types::{DriveCommand, Observation, VehicleSpec},
     Result,
@@ -6,31 +6,15 @@ use crate::{
 use std::time::Duration;
 
 pub trait VehicleIo {
-    /**
-     * Waits for a fresh observation with capture-aligned vehicle state and LiDAR data.
-     * @param timeout The maximum time to wait for an observation.
-     * @return Some(observation) when available, None on timeout, or an I/O or data error.
-     */
+    /// Wait up to `timeout` for a pose and a scan from the same moment.
     fn observe(&mut self, timeout: Duration) -> Result<Option<Observation>>;
-    /**
-     * Forwards speed and steering setpoints to the vehicle.
-     * The device must stop independently when commands are lost.
-     * @param command The requested speed in m/s and steering angle in radians.
-     * @return Ok(()) if the command is accepted, or a validation or I/O error.
-     */
+    /// Send a speed and a steering angle. The car itself has to stop if these stop arriving.
     fn drive(&mut self, command: DriveCommand) -> Result<()>;
-    /**
-     * Requests that the vehicle stop moving.
-     * @return Ok(()) if the stop request succeeds, or an I/O error.
-     */
+    /// Ask the car to stop.
     fn stop(&mut self) -> Result<()>;
 }
 
-/**
- * Validates a vehicle specification and requires measured hardware calibration.
- * @param spec The geometry, sensor transforms, and actuator limits to check.
- * @return Ok(()) if the specification is valid and calibrated, or an error otherwise.
- */
+/// The spec has to be valid, and `hardware_calibrated` has to be true. That flag means somebody measured the car.
 pub fn validate_hardware_spec(spec: &VehicleSpec) -> Result<()> {
     spec.validate()?;
     if !spec.hardware_calibrated {

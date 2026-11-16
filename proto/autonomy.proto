@@ -9,7 +9,7 @@ message LidarScan { repeated Point2 points = 1; Pose2 sensor_in_vehicle = 2; }
 message Observation { uint64 time_ns = 1; VehicleState state = 2; LidarScan scan = 3; }
 message Grid {
   Point2 origin = 1; double resolution_m = 2; uint32 width = 3;
-  uint32 height = 4; repeated bool occupied = 5;
+  uint32 height = 4; repeated uint32 weights = 5;
 }
 message Path { repeated Point2 points = 1; }
 message DriveCommand { double speed_mps = 1; double steering_rad = 2; }

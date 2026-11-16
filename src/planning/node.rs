@@ -4,14 +4,17 @@ use crate::{
     shared::protocol::{self, pb},
     Result,
 };
+
 /// Still waiting for the map subscription and the path publisher.
 /// Copy the shape of `perception::node::run`.
 pub fn run(mut ctx: Context) -> Result<()> {
+    // Edit me...
     // Read MapUpdate, call planned_update, publish on "path".
     // Copy the map's source time onto the path. Don't stamp it with "now".
     ctx.wait_for_wiring(
         "planning still needs its Zenoh subscriber and publisher; see docs/project.md, Connecting the pieces",
     )
+    // ...till here.
 }
 
 /// Turn a map into a path message.
@@ -58,7 +61,13 @@ pub fn planned_update(
             .as_ref()
             .ok_or_else(|| crate::error("Missing vehicle"))?,
     )?;
-    match planner.plan(&grid, &state, goal) {
+    match planner.plan(
+        &grid,
+        &state,
+        goal,
+        spec.clearance_m(),
+        ctx.info.goal_tolerance_m,
+    ) {
         Some(path) => {
             crate::planning::validation::validate_path(
                 &grid,

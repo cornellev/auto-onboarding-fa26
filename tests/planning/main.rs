@@ -19,7 +19,7 @@ fn reachable_courses_produce_valid_paths() {
     ] {
         let f: Fixture = serde_json::from_str(json).unwrap();
         let path = Planner::default()
-            .plan(&f.grid, &f.start, f.goal)
+            .plan(&f.grid, &f.start, f.goal, f.vehicle.clearance_m(), 0.2)
             .expect("A reachable goal needs a path");
         validate_path(
             &f.grid,
@@ -37,5 +37,7 @@ fn reachable_courses_produce_valid_paths() {
 fn blocked_goal_returns_none() {
     let f: Fixture =
         serde_json::from_str(include_str!("../../fixtures/planning/blocked.json")).unwrap();
-    assert!(Planner::default().plan(&f.grid, &f.start, f.goal).is_none());
+    assert!(Planner::default()
+        .plan(&f.grid, &f.start, f.goal, f.vehicle.clearance_m(), 0.2)
+        .is_none());
 }
