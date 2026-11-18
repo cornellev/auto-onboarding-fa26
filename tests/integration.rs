@@ -32,7 +32,7 @@ fn offline_modes_work_before_student_algorithms() {
 }
 
 #[test]
-#[ignore = "Live simulator + orchestrator + the onboarding manifest + one open page required; run with --test-threads=1"]
+#[ignore = "Live simulator, including its router, plus the onboarding manifest and one open page; run with --test-threads=1"]
 fn browser_observation_drive_stop_and_fresh_run() {
     let observe = run(&["observe", "--duration", "2"]);
     assert_eq!(observe["traveled_m"], 0.0);

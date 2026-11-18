@@ -4,7 +4,7 @@
 
 This module publishes practice messages for one node. The messages go to the local Zenoh router. The simulator, the browser, and the wheels are not involved. A node started with the printed run id can subscribe, run its loop, and publish, and nothing on the car will move.
 
-The command is `cargo run -- fixture-publish <role> --run <id>`. The program calls `publish`. The router has to be up. `Transport::connect` returns the usual message when it is not.
+The command is `cargo run -- fixture-publish <role> --run <id>`. The program calls `publish`. The simulator has to be running so its router is up. A browser tab is not required. `Transport::connect` returns the usual message when the router is not.
 
 ## The publisher
 

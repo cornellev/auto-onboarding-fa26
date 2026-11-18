@@ -2181,7 +2181,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 [[package]]
 name = "simcontrol"
 version = "0.1.0"
-source = "git+https://github.com/cornellev/ev-sim?rev=6c095b97ff1b5eed90777ccd15a53726b2ce86e2#6c095b97ff1b5eed90777ccd15a53726b2ce86e2"
+source = "git+https://github.com/cornellev/ev-sim?rev=ace5112f7f2bc6c14f834fcd1973c40cb4e09e62#ace5112f7f2bc6c14f834fcd1973c40cb4e09e62"
 dependencies = [
  "serde",
  "serde_json",

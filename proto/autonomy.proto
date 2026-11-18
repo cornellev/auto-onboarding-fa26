@@ -36,11 +36,13 @@ message PathUpdate {
 message CommandUpdate {
   Header header = 1; Header source = 2; uint64 path_sequence = 3;
   uint64 state_sequence = 4; uint64 valid_until_ns = 5; DriveCommand command = 6;
+  string control_lease_id = 7;
 }
 message RunInfo {
   Header header = 1; string schema_hash = 2; Point2 goal = 3;
   VehicleSpec vehicle = 4; Grid grid = 5; double goal_tolerance_m = 6;
   double timeout_s = 7; string mode = 8; Path control_path = 9;
+  string control_lease_id = 10;
 }
 message NodeStatus {
   Header header = 1; string node = 2; bool ready = 3;
