@@ -10,7 +10,7 @@ This module turns Protobuf messages into the plain structs in [`types`](types.md
 
 `DESCRIPTOR`
 
-The bundled file descriptor set, `proto/autonomy.binpb`, included as bytes. Orchestrator uses the same schema. Nodes compare a hash of it so a process built from a different schema does not join the run.
+The bundled file descriptor set, `proto/autonomy.binpb`, included as bytes. The simulator's onboarding interface uses this schema. Nodes compare a hash of it so a process built from a different schema does not join the run.
 
 `fingerprint()`
 
@@ -18,7 +18,7 @@ Return the hex SHA-256 of `DESCRIPTOR`. `Context::connect` rejects a `RunInfo` w
 
 `FRESH_NS`
 
-`300_000_000`. A map, path, or command whose capture time is older than this, relative to a newer capture, is too old to drive on. The same 300 ms bound is what orchestrator uses when it accepts a command.
+`300_000_000`. A map, path, or command whose capture time is older than this, relative to a newer capture, is too old to drive on. The simulator uses the same 300 ms of simulation time before it treats a command as stale.
 
 `FRESH_MS`
 

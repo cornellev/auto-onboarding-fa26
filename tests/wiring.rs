@@ -16,7 +16,7 @@ impl Drop for Processes {
     }
 }
 #[test]
-#[ignore = "Live local zenohd required; checks the provided node bootstrap"]
+#[ignore = "Simulator must be running so tcp/127.0.0.1:7447 is open; checks the provided node bootstrap"]
 fn three_processes_bootstrap_and_perception_publishes_unavailable_map() {
     let run = uuid::Uuid::new_v4().to_string();
     let t = Transport::connect(&run).unwrap();
@@ -70,7 +70,7 @@ fn three_processes_bootstrap_and_perception_publishes_unavailable_map() {
     }
 }
 #[test]
-#[ignore = "Student wiring acceptance: implement planning transport; requires local zenohd"]
+#[ignore = "Student wiring acceptance: implement planning transport; simulator must be running so tcp/127.0.0.1:7447 is open"]
 fn planning_wiring_publishes_no_path_before_algorithm_is_implemented() {
     let run = uuid::Uuid::new_v4().to_string();
     let t = Transport::connect(&run).unwrap();
@@ -99,7 +99,7 @@ fn planning_wiring_publishes_no_path_before_algorithm_is_implemented() {
     assert!(matches!(update.availability, 2 | 3));
 }
 #[test]
-#[ignore = "Student wiring acceptance: implement controls transport; requires local zenohd"]
+#[ignore = "Student wiring acceptance: implement controls transport; simulator must be running so tcp/127.0.0.1:7447 is open"]
 fn controls_wiring_publishes_a_stop_before_algorithm_is_implemented() {
     let run = uuid::Uuid::new_v4().to_string();
     let t = Transport::connect(&run).unwrap();

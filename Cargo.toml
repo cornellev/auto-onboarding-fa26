@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-simcontrol = { git = "https://github.com/cornellev/ev-sim", rev = "6c095b97ff1b5eed90777ccd15a53726b2ce86e2" }
+simcontrol = { git = "https://github.com/cornellev/ev-sim", rev = "ace5112f7f2bc6c14f834fcd1973c40cb4e09e62" }
 ctrlc = "3"
 ureq = { version = "3.5", features = ["json"] }
 base64 = "0.22"

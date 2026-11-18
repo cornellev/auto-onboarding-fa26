@@ -9,10 +9,25 @@ use crate::{
 };
 use std::{
     cell::Cell,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread::JoinHandle,
     time::{Duration, Instant},
 };
 
 const MANIFEST_ID: &str = "onboarding";
+const RENEW_PERIOD: Duration = Duration::from_millis(200);
+const RENEW_TIMEOUT: Duration = Duration::from_millis(300);
+#[cfg(test)]
+const LEASE_TTL: Duration = Duration::from_millis(750);
+
+/// Wait this long before the next renew. The period is measured from the attempt start,
+/// so a call that already used the 300 ms timeout does not add another 200 ms.
+fn renew_delay(elapsed: Duration) -> Duration {
+    RENEW_PERIOD.saturating_sub(elapsed)
+}
 
 /**
  * Checks that the simulator already has the saved onboarding run.
@@ -55,17 +70,159 @@ fn onboarding_manifest(server: &str) -> Result<serde_json::Value> {
     Ok(value)
 }
 
-fn topic<'a>(manifest: &'a serde_json::Value, id: &str) -> Result<&'a str> {
-    let topics = if manifest["topics"].is_array() {
-        &manifest["topics"]
-    } else {
-        &manifest["manifest"]["topics"]
-    };
-    topics
-        .as_array()
-        .and_then(|topics| topics.iter().find(|topic| topic["id"].as_str() == Some(id)))
-        .and_then(|topic| topic["name"].as_str())
-        .ok_or_else(|| crate::error(format!("Run manifest onboarding is missing topic {id}")))
+/// The simulator accepts observe, autonomous, and drive-test. Controls drives the car, so it uses autonomous.
+fn lease_mode(mode: &str) -> &'static str {
+    match mode {
+        "observe" => "observe",
+        "drive-test" => "drive-test",
+        _ => "autonomous",
+    }
+}
+
+fn acquire_lease(server: &str, browser_id: &str, mode: &str) -> Result<(String, String)> {
+    let value = request(
+        "POST",
+        &format!("{server}/api/interfaces/control-ownership"),
+        Some(&serde_json::json!({
+            "target": {"kind": "browser", "id": browser_id, "vehicleId": "ego"},
+            "mode": lease_mode(mode)
+        })),
+    )?;
+    let id = value["leaseId"]
+        .as_str()
+        .ok_or_else(|| crate::error("Control lease response is missing leaseId"))?
+        .to_string();
+    let token = value["token"]
+        .as_str()
+        .ok_or_else(|| crate::error("Control lease response is missing token"))?
+        .to_string();
+    Ok((id, token))
+}
+
+fn renew_lease(server: &str, lease_id: &str, token: &str) -> Result<()> {
+    request_with_timeout(
+        "POST",
+        &format!("{server}/api/interfaces/control-ownership/{lease_id}/renew"),
+        Some(&serde_json::json!({})),
+        Some(token),
+        RENEW_TIMEOUT,
+    )?;
+    Ok(())
+}
+
+fn release_lease(server: &str, lease_id: &str, token: &str) {
+    let _ = request_with_token(
+        "DELETE",
+        &format!("{server}/api/interfaces/control-ownership/{lease_id}"),
+        None,
+        Some(token),
+    );
+}
+
+fn halt_renewal(
+    renew_stop: &AtomicBool,
+    renew_thread: &mut Option<JoinHandle<()>>,
+    server: &str,
+    lease_id: &str,
+    token: &str,
+) {
+    renew_stop.store(true, Ordering::SeqCst);
+    if let Some(thread) = renew_thread.take() {
+        let _ = thread.join();
+    }
+    release_lease(server, lease_id, token);
+}
+
+fn blocks_next_launch(status: &str) -> bool {
+    matches!(status, "running" | "paused" | "ready" | "preparing")
+}
+
+fn stop_released_run(server: &str, browser_id: &str, run_id: &str) -> Result<simcontrol::Snapshot> {
+    let receipt = request(
+        "POST",
+        &format!("{server}/api/browser-sim/commands"),
+        Some(&serde_json::json!({
+            "action": "stop",
+            "browserId": browser_id,
+            "runId": run_id,
+        })),
+    )?;
+    let command_id = receipt["commandId"]
+        .as_str()
+        .ok_or_else(|| crate::error("Stop did not return a command"))?
+        .to_string();
+    for _ in 0..50 {
+        let receipt = request(
+            "GET",
+            &format!("{server}/api/browser-sim/commands/{command_id}"),
+            None,
+        )?;
+        match receipt["state"].as_str() {
+            Some("succeeded") => {
+                return serde_json::from_value(receipt["snapshot"].clone())
+                    .map_err(|err| crate::error(format!("Stop snapshot: {err}")));
+            }
+            Some("failed" | "unknown") => {
+                return Err(crate::error(format!("Stop failed: {receipt}")));
+            }
+            _ => std::thread::sleep(Duration::from_millis(100)),
+        }
+    }
+    Err(crate::error("Stop did not finish"))
+}
+
+/// The browser pauses when the lease ends, which puts a tab back into a state that blocks the next launch.
+/// Stop only after that pause, and without the released lease, or the pause undoes the stop.
+fn stop_after_release(
+    server: &str,
+    browser_id: &str,
+    run_id: &str,
+) -> Result<simcontrol::Snapshot> {
+    let client = simcontrol::Client::with_timeout(server, Duration::from_secs(10))?;
+    let mut sent = false;
+    for _ in 0..40 {
+        let snapshot = client.get_status(Some(browser_id))?.snapshot;
+        if !blocks_next_launch(&snapshot.status) {
+            return Ok(snapshot);
+        }
+        if snapshot.status == "paused" && !sent {
+            let stopped = stop_released_run(server, browser_id, run_id)?;
+            sent = true;
+            if !blocks_next_launch(&stopped.status) {
+                return Ok(stopped);
+            }
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    Err(crate::error(
+        "The simulator tab stayed paused after the run",
+    ))
+}
+
+/// A lease expires 750 ms after the last renewal, including while the browser is still launching.
+/// Each attempt gives up after 300 ms, and the next one starts 200 ms after the previous start.
+fn spawn_lease_renewal(
+    server: String,
+    lease_id: String,
+    token: String,
+    stop: Arc<AtomicBool>,
+) -> JoinHandle<()> {
+    std::thread::spawn(move || {
+        while !stop.load(Ordering::SeqCst) {
+            let started = Instant::now();
+            let _ = renew_lease(&server, &lease_id, &token);
+            let delay = renew_delay(started.elapsed());
+            let mut waited = Duration::ZERO;
+            while waited < delay {
+                if stop.load(Ordering::SeqCst) {
+                    return;
+                }
+                let slice = Duration::from_millis(10).min(delay - waited);
+                std::thread::sleep(slice);
+                waited += slice;
+            }
+        }
+    })
 }
 
 /**
@@ -119,10 +276,20 @@ fn request_with_token(
     value: Option<&serde_json::Value>,
     token: Option<&str>,
 ) -> Result<serde_json::Value> {
+    request_with_timeout(method, url, value, token, Duration::from_secs(10))
+}
+
+fn request_with_timeout(
+    method: &str,
+    url: &str,
+    value: Option<&serde_json::Value>,
+    token: Option<&str>,
+    timeout: Duration,
+) -> Result<serde_json::Value> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .http_status_as_error(false)
         .max_redirects(0)
-        .timeout_global(Some(Duration::from_secs(10)))
+        .timeout_global(Some(timeout))
         .build()
         .into();
     let mut response = match method {
@@ -185,44 +352,73 @@ pub fn setup_profile() -> Result<()> {
 }
 
 /**
- * Selects the sole connected simulator browser and requires its run to be stopped.
- * Disconnected browser history is ignored.
+ * Selects the server's default connected simulator browser and requires its run to be stopped.
  * @param tabs The simulator's browser inventory and current run statuses.
- * @return The browser ID, or an error for multiple/no connected browsers or an active run.
+ * @return The browser ID, or an error for an unavailable default or an active run.
  */
-fn single_browser(tabs: &simcontrol::Tabs) -> Result<String> {
-    let connected: Vec<_> = tabs
+fn default_browser(tabs: &simcontrol::Tabs) -> Result<String> {
+    let browser = tabs
         .browsers
         .iter()
-        .filter(|t| t.status.connected)
-        .collect();
-    if connected.is_empty() {
-        return Err(crate::error(
-            "No connected simulator tab. Open the simulator and leave the run stopped.",
-        ));
-    }
-    if connected.len() != 1 {
-        return Err(crate::error(
-            "More than one connected simulator tab. Close the extras and leave one run stopped.",
-        ));
-    }
-    if connected.iter().any(|tab| {
-        matches!(
-            tab.status.snapshot.status.as_str(),
-            "running" | "paused" | "ready" | "preparing"
-        )
-    }) {
+        .find(|tab| {
+            tab.status.connected
+                && tabs.browser_id.as_deref() == Some(tab.status.browser_id.as_str())
+        })
+        .ok_or_else(|| {
+            crate::error(
+                "No connected simulator tab. Open the simulator and leave the run stopped.",
+            )
+        })?;
+    if matches!(
+        browser.status.snapshot.status.as_str(),
+        "running" | "paused" | "ready" | "preparing"
+    ) {
         return Err(crate::error(
             "The simulator tab still has a run going. Stop it, then start again.",
         ));
     }
-    Ok(connected[0].status.browser_id.clone())
+    Ok(browser.status.browser_id.clone())
+}
+
+/// Stops a half-prepared browser run when `prepare` returns before `Sim` exists.
+struct LaunchCleanup {
+    renew_stop: Arc<AtomicBool>,
+    renew_thread: Option<JoinHandle<()>>,
+    server: String,
+    lease_id: String,
+    lease_token: String,
+    run: Option<simcontrol::Run>,
+    armed: bool,
+}
+impl Drop for LaunchCleanup {
+    fn drop(&mut self) {
+        if !self.armed {
+            return;
+        }
+        let browser_id = self.run.as_ref().map(|run| run.browser_id().to_string());
+        let run_id = self.run.as_ref().map(|run| run.run_id().to_string());
+        halt_renewal(
+            &self.renew_stop,
+            &mut self.renew_thread,
+            &self.server,
+            &self.lease_id,
+            &self.lease_token,
+        );
+        if let (Some(browser_id), Some(run_id)) = (browser_id, run_id) {
+            let _ = stop_after_release(&self.server, &browser_id, &run_id);
+        }
+    }
 }
 
 pub struct Sim {
     pub transport: Transport,
     pub run_id: String,
     pub info: pb::RunInfo,
+    server: String,
+    lease_id: String,
+    lease_token: String,
+    renew_stop: Arc<AtomicBool>,
+    renew_thread: Option<JoinHandle<()>>,
     run: Option<simcontrol::Run>,
     state_sub: Subscription,
     scan_sub: Subscription,
@@ -251,7 +447,7 @@ impl Sim {
     }
     /**
      * Launches the saved onboarding manifest, connects transport, and activates routing with the run paused.
-     * Requires one connected, stopped simulator browser. Does not delete the saved manifest.
+     * Uses the server's default connected browser and requires its run to be stopped.
      * @param course The course configuration and vehicle specification to validate.
      * @param server The simulator server's base URL.
      * @param mode The run mode recorded in RunInfo, such as observe, controls, or drive-test.
@@ -276,13 +472,8 @@ impl Sim {
             }
             Err(err) => return Err(err.into()),
         };
-        let browser = single_browser(&tabs)?;
-        let manifest = onboarding_manifest(server)?;
-        let run_id = uuid::Uuid::new_v4().to_string();
-        let server = server.trim_end_matches('/');
-        let tf_topic = topic(&manifest, "tf")?.to_string();
-        let lidar_topic = topic(&manifest, "front-lidar-points")?.to_string();
-        let command_topic = topic(&manifest, "controls-command")?.to_string();
+        let browser = default_browser(&tabs)?;
+        let server = server.trim_end_matches('/').to_string();
         let resolved = request(
             "POST",
             &format!("{server}/api/storage/run-manifests/{MANIFEST_ID}/resolve"),
@@ -292,6 +483,35 @@ impl Sim {
             .as_str()
             .ok_or_else(|| crate::error("Missing derived run hash"))?
             .to_string();
+        let (lease_id, lease_token) = acquire_lease(&server, &browser, mode)?;
+        let renew_stop = Arc::new(AtomicBool::new(false));
+        let mut cleanup = LaunchCleanup {
+            renew_thread: Some(spawn_lease_renewal(
+                server.clone(),
+                lease_id.clone(),
+                lease_token.clone(),
+                Arc::clone(&renew_stop),
+            )),
+            renew_stop: Arc::clone(&renew_stop),
+            server: server.clone(),
+            lease_id: lease_id.clone(),
+            lease_token: lease_token.clone(),
+            run: None,
+            armed: true,
+        };
+        let mut config = simcontrol::RunConfig::new(MANIFEST_ID);
+        config.browser_id = Some(browser);
+        config.autoplay = false;
+        config.control_lease = Some(simcontrol::ControlLease {
+            id: lease_id.clone(),
+            token: lease_token.clone(),
+        });
+        cleanup.run = Some(client.launch(config)?);
+        let run_id = cleanup.run.as_ref().unwrap().run_id().to_string();
+        let snapshot = cleanup.run.as_ref().unwrap().status()?.snapshot;
+        if snapshot.resolved_hash.as_deref() != Some(&expected) {
+            return Err(crate::error("Prepared course changed during launch"));
+        }
         let transport = Transport::connect(&run_id)?;
         let state_sub = transport.subscribe("state", 32)?;
         let scan_sub = transport.subscribe("lidar", 8)?;
@@ -304,6 +524,7 @@ impl Sim {
             goal_tolerance_m: course.goal_tolerance_m,
             timeout_s: course.timeout_s,
             mode: mode.into(),
+            control_lease_id: lease_id.clone(),
             control_path: if mode == "controls" {
                 Some(pb::Path {
                     points: protocol::convert(&course.control_path)?,
@@ -312,15 +533,18 @@ impl Sim {
                 None
             },
         };
-        let context = serde_json::json!({"run_id":run_id,"profile_id":"cev-onboarding-v1","fingerprint":protocol::fingerprint(),
-            "mode":mode,"vehicle":serde_json::to_value(&course.vehicle)?,"run_info":info,
-            "tf_topic":tf_topic,"lidar_topic":lidar_topic,"command_topic":command_topic});
-        api("POST", "/api/protobuf/runs", Some(&context))?;
-        let mut sim = Self {
+        transport.publish("run_info", &info)?;
+        cleanup.armed = false;
+        Ok(Self {
             transport,
             run_id,
             info,
-            run: None,
+            server,
+            lease_id,
+            lease_token,
+            renew_stop,
+            renew_thread: cleanup.renew_thread.take(),
+            run: cleanup.run.take(),
             state_sub,
             scan_sub,
             join: ObservationJoin::new(),
@@ -333,34 +557,7 @@ impl Sim {
             spec: course.vehicle.clone(),
             done: false,
             last_monitor: Instant::now(),
-        };
-        let mut config = simcontrol::RunConfig::new(MANIFEST_ID);
-        config.browser_id = Some(browser.clone());
-        config.autoplay = false;
-        sim.run = Some(match client.launch(config.clone()) {
-            Ok(run) => run,
-            Err(e)
-                if e.kind == simcontrol::ErrorKind::CommandFailed
-                    && e.message
-                        .contains("orchestrator transport is not connected") =>
-            {
-                std::thread::sleep(Duration::from_secs(1));
-                client.launch(config)?
-            }
-            Err(e) => return Err(e.into()),
-        });
-        let snapshot = sim.run.as_ref().unwrap().status()?.snapshot;
-        if snapshot.resolved_hash.as_deref() != Some(&expected) {
-            return Err(crate::error("Prepared course changed during launch"));
-        }
-        api(
-            "POST",
-            &format!("/api/protobuf/runs/{}/activate", sim.run_id),
-            Some(
-                &serde_json::json!({"browser_id":browser,"sim_run_id":sim.run.as_ref().unwrap().run_id(),"resolved_hash":expected}),
-            ),
-        )?;
-        Ok(sim)
+        })
     }
     /**
      * Resumes the prepared browser simulation run.
@@ -407,16 +604,23 @@ impl Sim {
         )
     }
     /**
-     * Checks routing ownership and faults before fetching the browser run's status.
+     * Republishes run info, then fetches the browser run's status.
      * @return The current simulator snapshot, or an error for a lost/faulted run or failed request.
      */
-    pub fn status(&self) -> Result<simcontrol::Snapshot> {
-        let routing = api("GET", "/api/protobuf/runs", None)?;
-        if routing["run"]["run_id"] != self.run_id || !routing["run"]["fault"].is_null() {
-            return Err(crate::error(format!(
-                "Routing run lost or failed: {routing}"
-            )));
+    pub fn heartbeat(&mut self) -> Result<()> {
+        if self.last_monitor.elapsed() < Duration::from_millis(200) {
+            return Ok(());
         }
+        self.transport.publish("run_info", &self.info)?;
+        self.last_monitor = Instant::now();
+        Ok(())
+    }
+    /**
+     * Fetches the browser run's status and keeps this run's configuration on the router.
+     * @return The current simulator snapshot, or an error for a lost run or failed request.
+     */
+    pub fn status(&mut self) -> Result<simcontrol::Snapshot> {
+        self.heartbeat()?;
         Ok(self
             .run
             .as_ref()
@@ -425,22 +629,27 @@ impl Sim {
             .snapshot)
     }
     /**
-     * Sends STOP, removes routing, and stops the browser run.
+     * Sends STOP, releases the lease, then stops the browser once that release has paused it.
      * Leaves the saved onboarding manifest in place.
      * @return The final simulator snapshot, or an error from any shutdown step.
      */
     pub fn finish(&mut self) -> Result<simcontrol::Snapshot> {
         self.stop()?;
-        api(
-            "DELETE",
-            &format!("/api/protobuf/runs/{}", self.run_id),
-            None,
-        )?;
-        let snapshot = self
+        let browser_id = self
             .run
-            .as_mut()
+            .as_ref()
             .ok_or_else(|| crate::error("No browser run"))?
-            .stop()?;
+            .browser_id()
+            .to_string();
+        let run_id = self.run.as_ref().unwrap().run_id().to_string();
+        halt_renewal(
+            &self.renew_stop,
+            &mut self.renew_thread,
+            &self.server,
+            &self.lease_id,
+            &self.lease_token,
+        );
+        let snapshot = stop_after_release(&self.server, &browser_id, &run_id)?;
         self.done = true;
         Ok(snapshot)
     }
@@ -448,17 +657,13 @@ impl Sim {
 impl VehicleIo for Sim {
     /**
      * Reads and joins state and LiDAR samples, rejecting invalid or expired observations.
-     * Periodically checks that the active routing run still belongs to this connection.
-     * @param timeout The maximum time to wait for a matching capture after the routing check.
-     * @return Some(observation) when matched, None on timeout, or a routing, data, or transport error.
+     * About every 250 ms, republishes this run's RunInfo.
+     * @param timeout The maximum time to wait for a matching capture.
+     * @return Some(observation) when matched, None on timeout, or a data or transport error.
      */
     fn observe(&mut self, timeout: Duration) -> Result<Option<Observation>> {
         if self.last_monitor.elapsed() > Duration::from_millis(250) {
-            let state = api("GET", "/api/protobuf/runs", None)?;
-            if state["run"]["run_id"] != self.run_id {
-                return Err(crate::error("Routing run replaced"));
-            }
-            self.last_monitor = Instant::now();
+            self.heartbeat()?;
         }
         let deadline = Instant::now() + timeout;
         loop {
@@ -518,7 +723,7 @@ impl VehicleIo for Sim {
                     &self.run_id,
                     self.command_seq.get(),
                     now,
-                    "map",
+                    "base_link",
                 )),
                 source: source.clone(),
                 path_sequence: self.path_seq.get(),
@@ -526,6 +731,7 @@ impl VehicleIo for Sim {
                 valid_until_ns: source
                     .as_ref()
                     .map_or(0, |h| h.time_ns + protocol::FRESH_NS),
+                control_lease_id: self.lease_id.clone(),
                 command: Some(protocol::convert(&command)?),
             },
         )
@@ -540,21 +746,23 @@ impl VehicleIo for Sim {
 }
 impl Drop for Sim {
     /**
-     * Attempts to remove routing and stop the browser run.
+     * Releases the control lease and stops the browser run.
      * Skips cleanup after finish has marked the run done and ignores cleanup errors.
      * Does not delete the saved onboarding manifest.
      */
     fn drop(&mut self) {
         if !self.done {
-            let _ = api(
-                "DELETE",
-                &format!("/api/protobuf/runs/{}", self.run_id),
-                None,
+            let browser_id = self.run.as_ref().map(|run| run.browser_id().to_string());
+            let run_id = self.run.as_ref().map(|run| run.run_id().to_string());
+            halt_renewal(
+                &self.renew_stop,
+                &mut self.renew_thread,
+                &self.server,
+                &self.lease_id,
+                &self.lease_token,
             );
-            if let Some(run) = &mut self.run {
-                if run.status().is_ok() {
-                    let _ = run.stop();
-                }
+            if let (Some(browser_id), Some(run_id)) = (browser_id, run_id) {
+                let _ = stop_after_release(&self.server, &browser_id, &run_id);
             }
         }
     }
@@ -563,24 +771,69 @@ impl Drop for Sim {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn disconnected_browser_history_does_not_count_as_a_publisher() {
+    fn browser_tabs() -> simcontrol::Tabs {
         let tab = serde_json::json!({"browserId":"current","isDefault":true,"connected":true,
-            "lastSeenAt":"now","lastInteractionAt":null,"interactionOrder":1,"commandId":null,
-            "status":"idle","runId":null,"manifestId":null,"manifestRevision":null,"resolvedHash":null,
+            "lastSeenAt":"now","lastInteractionAt":null,"interactionOrder":2,"commandId":null,
+            "status":"stopped","runId":null,"manifestId":null,"manifestRevision":null,"resolvedHash":null,
             "step":0,"timeNs":"0","stepNs":"20000000","transitioning":false,"degraded":false,
             "error":null,"experimentActive":false,"navigationBlocked":false,"runResult":null});
         let mut old = tab.clone();
         old["connected"] = serde_json::json!(false);
+        old["isDefault"] = serde_json::json!(false);
         old["status"] = serde_json::json!("running");
         old["browserId"] = serde_json::json!("expired");
-        let mut tabs: simcontrol::Tabs = serde_json::from_value(
-            serde_json::json!({"browserId":"current","browsers":[old,tab.clone()]}),
+        let mut other = old.clone();
+        other["connected"] = serde_json::json!(true);
+        other["browserId"] = serde_json::json!("background");
+        other["interactionOrder"] = serde_json::json!(1);
+        serde_json::from_value(
+            serde_json::json!({"browserId":"current","browsers":[old,other,tab]}),
         )
-        .unwrap();
-        assert_eq!(single_browser(&tabs).unwrap(), "current");
-        tabs.browsers.push(serde_json::from_value(tab).unwrap());
-        assert!(single_browser(&tabs).is_err());
+        .unwrap()
+    }
+    #[test]
+    fn default_browser_uses_server_selection_with_other_connected_runs() {
+        let mut tabs = browser_tabs();
+        assert_eq!(default_browser(&tabs).unwrap(), "current");
+        tabs.browsers[2].status.snapshot.status = "idle".into();
+        assert_eq!(default_browser(&tabs).unwrap(), "current");
+    }
+    #[test]
+    fn default_browser_rejects_unavailable_default_without_falling_back() {
+        let mut tabs = browser_tabs();
+        tabs.browsers[1].status.snapshot.status = "stopped".into();
+        for browser_id in [None, Some("missing"), Some("expired")] {
+            tabs.browser_id = browser_id.map(str::to_owned);
+            assert_eq!(
+                default_browser(&tabs).unwrap_err().to_string(),
+                "No connected simulator tab. Open the simulator and leave the run stopped."
+            );
+        }
+        tabs.browser_id = Some("current".into());
+        tabs.browsers[2].status.connected = false;
+        assert!(default_browser(&tabs).is_err());
+        tabs.browsers.clear();
+        assert!(default_browser(&tabs).is_err());
+    }
+    #[test]
+    fn default_browser_requires_selected_run_to_be_stopped() {
+        let mut tabs = browser_tabs();
+        for status in ["running", "paused", "ready", "preparing"] {
+            tabs.browsers[2].status.snapshot.status = status.into();
+            assert_eq!(
+                default_browser(&tabs).unwrap_err().to_string(),
+                "The simulator tab still has a run going. Stop it, then start again."
+            );
+        }
+    }
+    #[test]
+    fn renew_attempt_stays_inside_the_lease() {
+        assert!(RENEW_TIMEOUT + RENEW_PERIOD < LEASE_TTL);
+        assert_eq!(
+            renew_delay(Duration::from_millis(50)),
+            Duration::from_millis(150)
+        );
+        assert_eq!(renew_delay(RENEW_TIMEOUT), Duration::ZERO);
     }
     #[test]
     #[ignore = "Loopback socket test; run by the transport CI check"]

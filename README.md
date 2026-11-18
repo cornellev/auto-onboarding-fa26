@@ -10,13 +10,13 @@ cd auto-onboarding-fa26
 git remote add upstream https://github.com/cornellev/auto-onboarding-fa26.git
 ```
 
-`upstream` is the original repo. When we publish an update, including the simulator this weekend:
+`upstream` is the original repo. When we publish an update:
 
 ```sh
 git pull upstream main
 ```
 
-This is the starter for the month-long minicar project. You'll write how it sees obstacles, how it picks a route, and how it follows that route. The simulator is coming this weekend. Until then, the occupancy grid runs from a saved scan.
+This is the starter for the month-long minicar project. You'll write how it sees obstacles, how it picks a route, and how it follows that route. The occupancy grid can run from a saved scan before you start the simulator. Live runs are in [getting started](docs/getting-started.md).
 
 Start with [getting started](docs/getting-started.md). The project itself, including what we already wrote for you, is [the writeup](docs/project.md).
 

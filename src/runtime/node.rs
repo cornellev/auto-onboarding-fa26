@@ -125,7 +125,13 @@ impl Drop for Context {
             let _ = self.transport.publish(
                 "command",
                 &pb::CommandUpdate {
-                    header: Some(protocol::header(&self.transport.run, u64::MAX, 0, "map")),
+                    header: Some(protocol::header(
+                        &self.transport.run,
+                        u64::MAX,
+                        0,
+                        "base_link",
+                    )),
+                    control_lease_id: self.info.control_lease_id.clone(),
                     command: Some(pb::DriveCommand::default()),
                     ..Default::default()
                 },

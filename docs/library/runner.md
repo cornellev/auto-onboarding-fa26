@@ -12,7 +12,7 @@ The numbers come from a scenario file, `scenarios/onboarding.json` for a live ru
 
 `goal`
 
-World position of the goal, as a [`Point2`](types.md), in meters. On the onboarding course the red marker is `(−1.65, −0.93)`.
+World position of the goal, as a [`Point2`](types.md), in meters. On the onboarding course the red marker is the simulator point `(x, z) = (−3.29, 2.45)`, which is the planning goal `(−3.29, −2.45)`.
 
 `goal_tolerance_m`
 
