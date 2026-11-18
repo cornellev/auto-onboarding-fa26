@@ -42,7 +42,7 @@ fn run() -> Result<()> {
     let mut args = env::args().skip(1);
     let mode = args.next().unwrap_or_else(|| "perception".into());
     if matches!(mode.as_str(), "--help" | "-h" | "help") {
-        println!("cargo run -- <setup|observe|perception|planning|controls|autonomous|drive-test|node|fixture-publish>\n  --scenario <empty|detour|blocked>  planning maps only\n  --fixture <file>  --path <file>\n  --server <http://localhost:3000>  --duration <seconds>\n  node <role> --run <id> | fixture-publish <role> [--run <id>]\n  --manual-nodes\nLive runs launch the onboarding manifest. Default: perception. The simulator arrives this weekend.");
+        println!("cargo run -- <setup|observe|perception|planning|controls|autonomous|drive-test|node|fixture-publish>\n  --scenario <empty|detour|blocked>  planning maps only\n  --fixture <file>  --path <file>\n  --server <http://localhost:3000>  --duration <seconds>\n  node <role> --run <id> | fixture-publish <role> [--run <id>]\n  --manual-nodes\nLive runs launch the onboarding manifest. Default: perception. Start the simulator first. See docs/getting-started.md.");
         return Ok(());
     }
     let node_role = if mode == "node" || mode == "fixture-publish" {
@@ -93,8 +93,7 @@ fn run() -> Result<()> {
         return Err(error("Duration must be finite and positive"));
     }
     if mode == "setup" {
-        cev_onboarding::runtime::sim::setup(&server)?;
-        return cev_onboarding::runtime::sim::setup_profile();
+        return cev_onboarding::runtime::sim::setup(&server);
     }
     let interrupted = Arc::new(AtomicBool::new(false));
     let signal = interrupted.clone();
@@ -242,6 +241,7 @@ fn run() -> Result<()> {
         if interrupted.load(Ordering::SeqCst) {
             return Err(error("Interrupted waiting for nodes"));
         }
+        sim.heartbeat()?;
         children.check()?;
         if startup.elapsed() > Duration::from_secs(if manual { 120 } else { 15 }) {
             return Err(error("Required node did not connect"));
@@ -311,7 +311,7 @@ fn run() -> Result<()> {
             if let Some(update) =
                 transport::receive::<pb::CommandUpdate>(&commands, Duration::ZERO)?
             {
-                protocol::check_header(&update.header, &sim.run_id, "map")?;
+                protocol::check_header(&update.header, &sim.run_id, "base_link")?;
                 last_command = protocol::convert(
                     update
                         .command
@@ -396,10 +396,12 @@ fn run() -> Result<()> {
                 )?;
                 if last_print.elapsed() > Duration::from_secs(1) {
                     println!(
-                        "t={:.1}s pose=({:.2},{:.2}) LiDAR={} points — {status}",
+                        "t={:.1}s pose=({:.2},{:.2}) sensor=({:.3},{:.3}) LiDAR={} points — {status}",
                         observation.time_ns as f64 / 1e9,
                         observation.state.pose.position.x,
                         observation.state.pose.position.y,
+                        observation.scan.sensor_in_vehicle.position.x,
+                        observation.scan.sensor_in_vehicle.position.y,
                         observation.scan.points.len()
                     );
                     last_print = Instant::now();
@@ -423,13 +425,9 @@ fn run() -> Result<()> {
                 }
                 last_status = Instant::now();
             }
-            if last_observation.elapsed()
-                > if received {
-                    Duration::from_millis(300)
-                } else {
-                    Duration::from_secs(10)
-                }
-            {
+            // A hitch can pause pose and LiDAR for seconds of wall time. Wait for the next sample.
+            // Fail only when the simulator never sends one.
+            if !received && last_observation.elapsed() > Duration::from_secs(10) {
                 return Err(error("Capture-aligned sensors lost; start a fresh run"));
             }
         }

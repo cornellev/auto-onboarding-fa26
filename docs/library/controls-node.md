@@ -20,7 +20,7 @@ The loop that replaces it should subscribe to `state` and `path`, remember the l
 
 Build a `CommandUpdate` from one state message and an optional path message. `controller` is borrowed mutably. `sequence` becomes the command header's sequence. The helper does not increment it. The caller owns that counter.
 
-Read the state with `protocol::state`, which requires frame `"map"` and a finite pose and speed. The command header uses `sequence`, the state's capture time, and frame `"map"`. `state_sequence` is the state header's sequence. The command field starts as `DriveCommand::STOP`, and `source`, `path_sequence`, and `valid_until_ns` stay empty or zero until a path is actually followed.
+Read the state with `protocol::state`, which requires frame `"map"` and a finite pose and speed. The command header uses `sequence`, the state's capture time, and frame `"base_link"`. `state_sequence` is the state header's sequence. `control_lease_id` is copied from the run. The command field starts as `DriveCommand::STOP`, and `source`, `path_sequence`, and `valid_until_ns` stay empty or zero until a path is actually followed.
 
 The checks run in this order.
 

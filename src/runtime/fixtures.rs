@@ -38,6 +38,7 @@ pub fn publish(
         goal_tolerance_m: course.goal_tolerance_m,
         timeout_s: duration.unwrap_or(60.),
         mode: "transport-fixture".into(),
+        control_lease_id: String::new(),
         control_path: if role == "controls" {
             Some(pb::Path {
                 points: protocol::convert(&course.control_path)?,

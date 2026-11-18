@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 860" role="img" aria-labelledby="title desc">
+  <title id="title">Reference view, perception fixture</title>
+  <desc id="desc">Two occupied cells on the onboarding grid. Cell 46, 41 contains the world point 1.00, 1.10. Cell 56, 51 contains 2.00, 2.10. The green dot is the course goal (−3.29, −2.45). Rings, the axle arrow, and the zoom are guides and are not drawn by cargo run -- perception.</desc>
+  <rect width="1180" height="860" fill="#fafafa"/>
+  <text x="48" y="42" font-family="ui-sans-serif, system-ui, sans-serif" font-size="22" fill="#1a1a1a">Reference view</text>
+  <text x="1132" y="42" text-anchor="end" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" fill="#666">Perception fixture</text>
+  <text x="48" y="68" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#333">Saved scan, fixtures/perception/observation.json. The map on the left is the view.svg a working perception run writes.</text>
+  <line x1="48" y1="84" x2="1132" y2="84" stroke="#e2e2e2"/>
+  <text x="78" y="118" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" fill="#1a1a1a">Full map</text>
+  <text x="154" y="118" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#666">x right, y up · meters</text>
+  <text x="640" y="118" font-family="ui-sans-serif, system-ui, sans-serif" font-size="15" fill="#1a1a1a">The two cells</text>
+  <text x="752" y="118" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#666">0.1 m squares · hit on the bottom-left corner</text>
+  <defs>
+    <clipPath id="map"><rect x="78" y="136" width="490" height="448"/></clipPath>
+    <clipPath id="zoom"><rect x="640" y="136" width="500.0" height="500.0"/></clipPath>
+    <marker id="head" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L8 4 L0 8 Z" fill="#1a1a1a"/>
+    </marker>
+  </defs>
+  <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" fill="#666">
+    <text x="70" y="136" text-anchor="end" dominant-baseline="middle" fill="#888">3.4</text>
+    <text x="70" y="164" text-anchor="end" dominant-baseline="middle" fill="#666">3</text>
+    <text x="70" y="234" text-anchor="end" dominant-baseline="middle" fill="#666">2</text>
+    <text x="70" y="304" text-anchor="end" dominant-baseline="middle" fill="#666">1</text>
+    <text x="70" y="374" text-anchor="end" dominant-baseline="middle" fill="#666">0</text>
+    <text x="70" y="444" text-anchor="end" dominant-baseline="middle" fill="#666">−1</text>
+    <text x="70" y="514" text-anchor="end" dominant-baseline="middle" fill="#666">−2</text>
+    <text x="70" y="584" text-anchor="end" dominant-baseline="middle" fill="#666">−3</text>
+    <text x="78" y="600" text-anchor="middle" fill="#888">−3.6</text>
+    <text x="120" y="600" text-anchor="middle" fill="#666">−3</text>
+    <text x="190" y="600" text-anchor="middle" fill="#666">−2</text>
+    <text x="260" y="600" text-anchor="middle" fill="#666">−1</text>
+    <text x="330" y="600" text-anchor="middle" fill="#666">0</text>
+    <text x="400" y="600" text-anchor="middle" fill="#666">1</text>
+    <text x="470" y="600" text-anchor="middle" fill="#666">2</text>
+    <text x="540" y="600" text-anchor="middle" fill="#666">3</text>
+    <text x="568" y="600" text-anchor="middle" fill="#888">3.4</text>
+    <text x="632" y="136" text-anchor="end" dominant-baseline="middle">2.5</text>
+    <text x="632" y="261" text-anchor="end" dominant-baseline="middle">2.0</text>
+    <text x="632" y="386" text-anchor="end" dominant-baseline="middle">1.5</text>
+    <text x="632" y="511" text-anchor="end" dominant-baseline="middle">1.0</text>
+    <text x="632" y="636" text-anchor="end" dominant-baseline="middle">0.5</text>
+    <text x="640" y="652" text-anchor="middle">0.5</text>
+    <text x="765" y="652" text-anchor="middle">1.0</text>
+    <text x="890" y="652" text-anchor="middle">1.5</text>
+    <text x="1015" y="652" text-anchor="middle">2.0</text>
+    <text x="1140" y="652" text-anchor="middle">2.5</text>
+  </g>
+  <rect x="78" y="136" width="490" height="448" fill="#ffffff" stroke="#888888"/>
+  <g clip-path="url(#map)">
+    <line x1="120" y1="136" x2="120" y2="584" stroke="#e4e4e4"/>
+    <line x1="190" y1="136" x2="190" y2="584" stroke="#e4e4e4"/>
+    <line x1="260" y1="136" x2="260" y2="584" stroke="#e4e4e4"/>
+    <line x1="330" y1="136" x2="330" y2="584" stroke="#e4e4e4"/>
+    <line x1="400" y1="136" x2="400" y2="584" stroke="#e4e4e4"/>
+    <line x1="470" y1="136" x2="470" y2="584" stroke="#e4e4e4"/>
+    <line x1="540" y1="136" x2="540" y2="584" stroke="#e4e4e4"/>
+    <line x1="78" y1="514" x2="568" y2="514" stroke="#e4e4e4"/>
+    <line x1="78" y1="444" x2="568" y2="444" stroke="#e4e4e4"/>
+    <line x1="78" y1="374" x2="568" y2="374" stroke="#e4e4e4"/>
+    <line x1="78" y1="304" x2="568" y2="304" stroke="#e4e4e4"/>
+    <line x1="78" y1="234" x2="568" y2="234" stroke="#e4e4e4"/>
+    <line x1="78" y1="164" x2="568" y2="164" stroke="#e4e4e4"/>
+    <rect x="400" y="290" width="7" height="7" fill="#242424"/>
+    <rect x="470" y="220" width="7" height="7" fill="#242424"/>
+  </g>
+  <circle cx="400" cy="297" r="12" fill="none" stroke="#8f1d2c" stroke-width="1.25"/>
+  <circle cx="470" cy="227" r="12" fill="none" stroke="#8f1d2c" stroke-width="1.25"/>
+  <circle cx="99.7" cy="545.5" r="6" fill="#147445"/>
+  <line x1="400" y1="368" x2="400" y2="348" stroke="#1a1a1a" stroke-width="1.5" marker-end="url(#head)"/>
+  <circle cx="400" cy="374" r="4" fill="#1a1a1a"/>
+  <rect x="109.7" y="529.5" width="168" height="18" fill="#ffffff"/>
+  <text x="113.7" y="542.5" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#147445">goal (−3.29, −2.45)</text>
+  <rect x="414" y="258" width="104" height="18" fill="#ffffff"/>
+  <text x="418" y="272" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#1a1a1a">cell (46, 41)</text>
+  <rect x="354" y="188" width="104" height="18" fill="#ffffff"/>
+  <text x="358" y="202" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#1a1a1a">cell (56, 51)</text>
+  <rect x="410" y="366" width="132" height="34" fill="#ffffff"/>
+  <text x="416" y="380" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#1a1a1a">rear axle (1.00, 0.00)</text>
+  <text x="416" y="396" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#555">facing +y</text>
+  <rect x="640" y="136" width="500.0" height="500.0" fill="#ffffff" stroke="#888888"/>
+  <g clip-path="url(#zoom)">
+    <line x1="640" y1="136" x2="640" y2="636.0" stroke="#c8c8c8"/>
+    <line x1="640" y1="136" x2="1140.0" y2="136" stroke="#c8c8c8"/>
+    <line x1="665" y1="136" x2="665" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="161" x2="1140.0" y2="161" stroke="#ececec"/>
+    <line x1="690" y1="136" x2="690" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="186" x2="1140.0" y2="186" stroke="#ececec"/>
+    <line x1="715" y1="136" x2="715" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="211" x2="1140.0" y2="211" stroke="#ececec"/>
+    <line x1="740" y1="136" x2="740" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="236" x2="1140.0" y2="236" stroke="#ececec"/>
+    <line x1="765" y1="136" x2="765" y2="636.0" stroke="#c8c8c8"/>
+    <line x1="640" y1="261" x2="1140.0" y2="261" stroke="#c8c8c8"/>
+    <line x1="790" y1="136" x2="790" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="286" x2="1140.0" y2="286" stroke="#ececec"/>
+    <line x1="815" y1="136" x2="815" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="311" x2="1140.0" y2="311" stroke="#ececec"/>
+    <line x1="840" y1="136" x2="840" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="336" x2="1140.0" y2="336" stroke="#ececec"/>
+    <line x1="865" y1="136" x2="865" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="361" x2="1140.0" y2="361" stroke="#ececec"/>
+    <line x1="890" y1="136" x2="890" y2="636.0" stroke="#c8c8c8"/>
+    <line x1="640" y1="386" x2="1140.0" y2="386" stroke="#c8c8c8"/>
+    <line x1="915" y1="136" x2="915" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="411" x2="1140.0" y2="411" stroke="#ececec"/>
+    <line x1="940" y1="136" x2="940" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="436" x2="1140.0" y2="436" stroke="#ececec"/>
+    <line x1="965" y1="136" x2="965" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="461" x2="1140.0" y2="461" stroke="#ececec"/>
+    <line x1="990" y1="136" x2="990" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="486" x2="1140.0" y2="486" stroke="#ececec"/>
+    <line x1="1015" y1="136" x2="1015" y2="636.0" stroke="#c8c8c8"/>
+    <line x1="640" y1="511" x2="1140.0" y2="511" stroke="#c8c8c8"/>
+    <line x1="1040" y1="136" x2="1040" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="536" x2="1140.0" y2="536" stroke="#ececec"/>
+    <line x1="1065" y1="136" x2="1065" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="561" x2="1140.0" y2="561" stroke="#ececec"/>
+    <line x1="1090" y1="136" x2="1090" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="586" x2="1140.0" y2="586" stroke="#ececec"/>
+    <line x1="1115" y1="136" x2="1115" y2="636.0" stroke="#ececec"/>
+    <line x1="640" y1="611" x2="1140.0" y2="611" stroke="#ececec"/>
+    <line x1="1140" y1="136" x2="1140" y2="636.0" stroke="#c8c8c8"/>
+    <line x1="640" y1="636" x2="1140.0" y2="636" stroke="#c8c8c8"/>
+    <rect x="765" y="461" width="25" height="25" fill="#242424"/>
+    <circle cx="765" cy="486" r="4.5" fill="#8f1d2c" stroke="#ffffff" stroke-width="1.5"/>
+    <rect x="1015" y="211" width="25" height="25" fill="#242424"/>
+    <circle cx="1015" cy="236" r="4.5" fill="#8f1d2c" stroke="#ffffff" stroke-width="1.5"/>
+  </g>
+  <rect x="802.5" y="465.5" width="168" height="58" fill="#ffffff"/>
+  <text x="815" y="481.5" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" fill="#1a1a1a">cell (46, 41)</text>
+  <text x="815" y="499.5" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#333">hit (1.00, 1.10) m</text>
+  <text x="815" y="515.5" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#555">the repeated scan point</text>
+  <rect x="827" y="219" width="176" height="42" fill="#ffffff"/>
+  <text x="999" y="237" text-anchor="end" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" fill="#1a1a1a">cell (56, 51)</text>
+  <text x="999" y="255" text-anchor="end" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#333">hit (2.00, 2.10) m</text>
+  <text x="48" y="700" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" fill="#1a1a1a">■ Occupied</text>
+  <text x="148" y="700" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" fill="#147445">Green: goal</text>
+  <text x="268" y="700" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" fill="#8f1d2c">Red: guides on this sheet only</text>
+  <text x="530" y="700" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" fill="#555">Later runs add a blue path and an orange driven trace. This one has neither.</text>
+  <text x="48" y="740" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#222">Your view.svg should show the two black cells and the green goal. This command draws no path and no driven trace, so the blue and orange lines are absent.</text>
+  <text x="48" y="764" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#222">The rings, the axle arrow, and the zoom are not in the program's picture. They only make the cells easy to find.</text>
+  <text x="48" y="788" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#222">Cell (46, 41) contains (1.00, 1.10). Cell (56, 51) contains (2.00, 2.10). The first scan point is stored twice, and both copies fall in (46, 41).</text>
+  <text x="48" y="812" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#222">Use Grid::cell for the column and row. The hit is the bottom-left corner of the square, not the middle. Middles are (1.05, 1.15) and (2.05, 2.15).</text>
+</svg>
