@@ -74,8 +74,8 @@ A few files in the repository sit outside this manual. `src/perception/algorithm
   - `Mode` — `Observe`, `Controls`, `Autonomous`, or `DriveTest`.
   - `Update` — the command, status, path, and flags for one recorded step.
 - [`sim`](sim.md) — The simulator connection
-  - `setup` — check that the saved `onboarding` manifest is installed. `setup_profile` registers the Protobuf profile with orchestrator. `api` sends one JSON request to orchestrator.
-  - `Sim` — one prepared run. `prepare` launches it paused. `launch` prepares a drive-test and resumes it. `resume` starts the clock. `observe` returns a pose and a scan from the same moment. `path` publishes waypoints. `drive` publishes a limited command. `stop` publishes a stop. `status` reads the browser run. `finish` stops it and removes the routing. Dropping a `Sim` stops a run that `finish` did not.
+  - `setup` — check that the saved `onboarding` manifest is installed. `cargo run -- setup` stops there. `setup_profile` still registers a Protobuf profile with an orchestrator, which this simulator does not run.
+  - `Sim` — one prepared run. `prepare` takes the control lease and launches the browser paused. `launch` prepares a drive-test and resumes it. `resume` starts the clock. `observe` returns a pose and a scan from the same moment. `path` publishes waypoints. `drive` publishes a limited command on `base_link` with that lease. `stop` publishes a stop. `status` reads the browser run. `finish` releases the lease and then stops the browser. Dropping a `Sim` does that cleanup when `finish` did not.
 - [`fixtures`](fixtures.md) — Practice publishers that never move the car
   - `publish` — send `run_info` and the inputs for `perception`, `planning`, or `controls`, about ten times a second.
 - [`hardware`](hardware.md) — The trait a physical car would implement

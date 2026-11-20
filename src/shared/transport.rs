@@ -34,7 +34,7 @@ impl Transport {
         )?;
         let session = zenoh::open(config).wait().map_err(|err| {
             crate::error(format!(
-                "Start the router: zenohd -c config/zenoh-router.json5 ({err})"
+                "Start the simulator with npm run dev. It listens on tcp/127.0.0.1:7447. Set CEV_ZENOH_ENDPOINT only to match CEV_SIM_ZENOH_TCP_PORT ({err})"
             ))
         })?;
         Ok(Self {

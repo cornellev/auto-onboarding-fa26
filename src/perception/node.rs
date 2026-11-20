@@ -40,8 +40,6 @@ pub fn run(mut ctx: Context) -> Result<()> {
     let mut join = ObservationJoin::new();
     let (mut state_fresh, mut scan_fresh) = (Freshness::default(), Freshness::default());
     let mut perception = Perception::new(protocol::convert(ctx.info.grid.as_ref().unwrap())?);
-    let mut last_observation = Instant::now();
-    let mut received = false;
 
     // alright, we're ready to go! publish a "ready" status and start the loop.
     ctx.status(
@@ -103,11 +101,6 @@ pub fn run(mut ctx: Context) -> Result<()> {
                 },
                 observation.time_ns,
             )?;
-            last_observation = Instant::now();
-            received = true;
-        }
-        if received && last_observation.elapsed() > Duration::from_millis(300) {
-            return Err(crate::error("Perception source expired"));
         }
         std::thread::sleep(Duration::from_millis(5));
     }

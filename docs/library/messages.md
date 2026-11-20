@@ -70,7 +70,7 @@ Capture time, in nanoseconds since the run started. Republishing a message shoul
 
 `frame_id`
 
-The frame that time is attached to. The helpers expect `"map"` on state, maps, paths, commands, run info, and status, and `"front_lidar_frame"` on a scan.
+The frame that time is attached to. The helpers expect `"map"` on state, maps, paths, run info, and status, `"base_link"` on a command, and `"front_lidar_frame"` on a scan.
 
 `protocol::header` builds one of these. `protocol::check_header` checks it.
 
@@ -140,7 +140,7 @@ Topic `command`. `controlled_update` and `Sim::drive` both publish this shape.
 
 `header`
 
-For a node, a new header: the caller's sequence, the state message's capture time, and frame `"map"`.
+For a node, a new header: the caller's sequence, the state message's capture time, and frame `"base_link"`.
 
 `source`
 
@@ -161,6 +161,10 @@ The state header's sequence.
 `command`
 
 The speed and steering. The early stop stores `DriveCommand::STOP`.
+
+`control_lease_id`
+
+The lease from this run's `RunInfo`. `controlled_update` copies it onto the command. The simulator does not drive a command that carries a different lease.
 
 ## Run configuration and status
 
@@ -191,6 +195,10 @@ A short name such as `"observe"`, `"controls"`, `"autonomous"`, `"drive-test"`, 
 `control_path`
 
 The practice path, present when the mode is controls. Absent for the other modes. The controls fixture publisher sends it on `path`.
+
+`control_lease_id`
+
+The lease for this run. The controls node reads it from here and copies it onto each command.
 
 *class* `pb::NodeStatus`
 

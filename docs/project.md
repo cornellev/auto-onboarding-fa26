@@ -6,7 +6,7 @@ That breaks into three questions. How does the car tell where the obstacles are?
 
 The code you already have compiles, talks to the simulator, and holds the car still. The three empty functions are yours: `Perception::update`, `Planner::plan`, and `Controller::command`.
 
-If the tools aren't installed, do [getting started](getting-started.md) first. The simulator is coming this weekend. Until then, `cargo run -- perception` writes `view.svg` from a saved scan. Remember to look at the project timeline posted in Discord. Just as a reminder, we'll be done with this project by **December 6** - at these sessions, you'll be sharing your code, not just your results.
+If the tools aren't installed, do [getting started](getting-started.md) first. `cargo run -- perception` writes `view.svg` from a saved scan, with no simulator. Live runs use the simulator stack on that same page. Remember to look at the project timeline posted in Discord. Just as a reminder, we'll be done with this project by **December 6** - at these sessions, you'll be sharing your code, not just your results.
 
 ## Your plan
 
@@ -36,7 +36,7 @@ A LiDAR point starts where the sensor is looking: x forward, y to the left, in m
 
 `Perception` in `src/perception/algorithm.rs` holds the map. `update` is handed an `Observation`, which is the pose, the scan points, and the sensor mount, and it should return `Some(&self.map)` once you have a map. Right now it returns `None`, which is why the car never moves. The runner builds an empty grid and passes it to `Perception::new`. A new cell is 0, and 0 is free. That's reasonable on these courses, where the obstacles sit still and the car can see them. It would be a bad assumption on a course the car hasn't fully looked at.
 
-The browser's vehicle origin is `base_link`. `rear_axle_in_base.x` is −0.093454 m, so the onboarding spawn — a base_link near `(2.64, 0, −2.89)` in the simulator, facing −x — is the planning start `(2.733454, 2.89)`. The red marker is the course goal `(−1.65, −0.93)`. The pose you receive is already the rear axle, with +x forward and +y left. The simulator frame is different: Y is up, and heading is `(cos yaw, 0, −sin yaw)`. The nodes have already done that conversion. `scenarios/onboarding.json` stores an empty grid. The obstacles for `cargo run -- planning` are in `fixtures/planning`. The live obstacles arrive as LiDAR.
+The browser's vehicle origin is `base_link`. `rear_axle_in_base.x` is −0.093454 m, so the onboarding spawn — a base_link near `(2.64, 0, −2.89)` in the simulator, facing −x — is the planning start `(2.733454, 2.89)`. The red marker is the simulator point `(x, z) = (−3.29, 2.45)`, which is the planning goal `(−3.29, −2.45)` because planning y is simulator −z. The pose you receive is already the rear axle, with +x forward and +y left. The simulator frame is different: Y is up, and heading is `(cos yaw, 0, −sin yaw)`. The nodes have already done that conversion. `scenarios/onboarding.json` stores an empty grid. The obstacles for `cargo run -- planning` are in `fixtures/planning`. The live obstacles arrive as LiDAR.
 
 `Grid::cell` gives you the column and row of a world point, or `None` if the point is off the map. Columns follow x, rows follow y, and the cell is stored at `row * width + column`. `set_occupied` writes 255 into one cell. `set_weight` writes a belief from 0 to 255, and 0 clears the cell. Both ignore a column or row that isn't on the map. `is_occupied` is true when the stored weight is at least the threshold. Pass `None` for 128. Pass `Some(100)` to treat a weight of 100 as occupied, which the default does not. Rust has no default arguments, so `None` is how you ask for 128. `center` is the middle of a cell. You'll want that later, when a planner has to turn cells back into points. None of these helpers decide which returns are obstacles.
 
@@ -128,16 +128,15 @@ The pose you get is already the middle of the rear axle. Take the wheelbase from
 
 ## Connecting the pieces
 
-The router commands in this section arrive with the simulator this weekend. Until then, use `cargo run -- perception`.
+Start the simulator as in [getting started](getting-started.md) before these commands. It opens the router. Until that is up, use `cargo run -- perception`.
 
 One scan takes this trip:
 
-1. The simulator tells orchestrator where the car is and what the laser sees.
-2. Orchestrator publishes `state` and `lidar` for this run.
-3. Perception reads both, matches them by time, and publishes a `map`.
-4. Planning reads the map and publishes a `path`.
-5. Controls reads the state and the path and publishes a `command`.
-6. Orchestrator checks the command and tells the simulator what to do with the wheels.
+1. The simulator publishes `state` and `lidar` for this run on the router.
+2. Perception reads both, matches them by time, and publishes a `map`.
+3. Planning reads the map and publishes a `path`.
+4. Controls reads the state and the path and publishes a `command`.
+5. The simulator applies that command to the wheels. The command has to carry this run's control lease, or the simulator will not drive.
 
 Each run has its own topic names, so a leftover message from the last run can't drive this one. A missing or old path stops the car. Publishing an old plan again doesn't make it new.
 
@@ -163,7 +162,7 @@ Use `perception` or `controls` in place of `planning` to practice those. This pu
 
 ## Showing your work
 
-Get each piece working on its own files before you combine them. `cargo run -- autonomous` arrives with the simulator this weekend. Until then, show the perception fixture, and the planning scenarios when you get there.
+Get each piece working on its own files before you combine them. The perception fixture and the planning scenarios do not need the simulator. `cargo run -- autonomous` does. Start the simulator as in [getting started](getting-started.md), then keep one stopped simulator tab.
 
 ```sh
 cargo run -- autonomous
@@ -179,7 +178,7 @@ By December 6, the basic version should drive a simple course, with your own cod
 
 ## If the car just sits there
 
-The simulator notes below arrive with this weekend's install. Most of the time it's one of these.
+Most of the time it's one of these.
 
 - "Perception unavailable" means `update` is still empty. Start with the perception fixture.
 - "No path" means the planner is still empty, or the goal really is walled off. Try the empty planning map.
@@ -190,12 +189,12 @@ The simulator notes below arrive with this weekend's install. Most of the time i
 - A path through a wall checked the cells under the waypoints and skipped the line between them.
 - Steering away from the path means the sign is backwards. Positive steering is left. Try both directions on a short path.
 - "Command limited" means the numbers were real, and bigger than the car's speed or steering limit.
-- Updates slower than 300 ms stop the car. That watchdog is `FRESH_NS` in the Rust nodes and the same 300 ms in orchestrator's command adapter. Leave the run manifest's 100 ms command `timeoutNs` and 200 ms `validityNs` as they are.
-- "No connected simulator tab", "More than one connected simulator tab", and "The simulator tab still has a run going" are three different problems. Stop the run, and keep a single simulator tab.
-- "The process at … is not the simulator" means `--server` is some other program. Use the simulator from getting started. Another program on port 3000 produces this message.
-- "Start the router: zenohd -c config/zenoh-router.json5" means the local Zenoh router is not running.
+- Updates slower than 300 ms of simulation time stop the car. That bound is `FRESH_NS` in the Rust nodes and `watchdogNs` on the onboarding run. Leave the manifest's command `timeoutNs` and `validityNs` as they are.
+- "No connected simulator tab" means the server has no available default page. Open the simulator in a normal desktop browser window and click the intended page. "The simulator tab still has a run going" means that selected page must be stopped before launch. Onboarding selects the server's most recently interacted-with connected page and keeps the run on that page; other tabs or embedded Cursor previews do not block it. A closed or crashed page can remain connected for up to 15 seconds after its last heartbeat. If an older build reports "More than one connected simulator tab", close extra simulator previews and wait 15 seconds, or rebuild onboarding with the default-page selection fix.
+- "The process at … is not the simulator" means `--server` is some other program. The default is `http://localhost:3000`. Another program on that port produces this message. Point `--server`, or `CEV_SIM_SERVER`, at the URL `npm run dev` printed.
+- "Start the simulator with npm run dev" means nothing is listening on this repo's TCP address. Start the simulator and wait for its `[zenoh-router] ready` line. Do not start `zenohd`. If the simulator says a foreign listener owns the Zenoh port, stop that process and start the simulator again. `CEV_ZENOH_ENDPOINT` stays unset unless `CEV_SIM_ZENOH_TCP_PORT` changed the port.
 - `setup` only checks that the simulator already has the run manifest named `onboarding`. It does not install a world. If that manifest is missing, create it in the simulator.
-- If you restart orchestrator after the page connected, refresh the page.
+- If you restart the simulator after the page connected, refresh the page. A tab left `paused` from the last run has to be stopped, or reloaded, before the next launch.
 - `simulator_passed: false` after the car reached the goal can mean the browser recorded the stop as an interruption. Check `goal_reached` and the termination reason in `summary.json`.
 
 When the compiler complains, read the first error. A reference lets you look at a value. It doesn't store one. Keep the map, the search, and the controller's progress on your struct. If you're still borrowing that struct, finish the borrow before you change it.

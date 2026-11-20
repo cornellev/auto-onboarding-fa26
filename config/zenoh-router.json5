@@ -1,1 +1,9 @@
-{mode:"router",listen:{endpoints:["tcp/127.0.0.1:7447"]},scouting:{multicast:{enabled:false},gossip:{enabled:false}},plugins_loading:{enabled:false}}
+// Not a live router config. The simulator starts the router on
+// tcp/127.0.0.1:7447 and opens the browser WebSocket itself.
+// Do not start zenohd with this file. See docs/getting-started.md.
+{
+  mode: "router",
+  listen: { endpoints: ["tcp/127.0.0.1:7447"] },
+  scouting: { multicast: { enabled: false }, gossip: { enabled: false } },
+  plugins_loading: { enabled: false },
+}

@@ -60,7 +60,7 @@ Planning's `run` and controls' `run` call this with the sentence that says the l
 
 ## Dropping a context
 
-When a `Context` is dropped, a controls node tries to publish one more command: a default `DriveCommand` on `command`, with sequence `u64::MAX`, time 0, and frame `"map"`. The default command is zero speed and zero steering. The publish's error is ignored, because `Drop` cannot return it.
+When a `Context` is dropped, a controls node tries to publish one more command: a default `DriveCommand` on `command`, with sequence `u64::MAX`, time 0, frame `"base_link"`, and this run's `control_lease_id`. The default command is zero speed and zero steering. The publish's error is ignored, because `Drop` cannot return it.
 
 Perception and planning do not publish on drop. The launcher still stops the car when the run ends. The extra command is a last attempt from the process that owns the command topic, in case the loop exits while a command is still in flight.
 

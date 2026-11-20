@@ -28,7 +28,7 @@ Open a client session for `run`.
 
 The id has to be 1 to 96 bytes, each an ASCII letter, digit, or hyphen. An empty id, a longer id, or any other byte returns `"Invalid run id"`.
 
-The endpoint is the environment variable `CEV_ZENOH_ENDPOINT` when it is set, and `tcp/127.0.0.1:7447` otherwise. The session is a client, connects to that endpoint, exits if the connection fails, and leaves multicast and gossip disabled. Return `"Start the router: zenohd -c config/zenoh-router.json5 (...)"` when the router does not answer. The parenthetical text is the Zenoh error.
+The endpoint is the environment variable `CEV_ZENOH_ENDPOINT` when it is set, and `tcp/127.0.0.1:7447` otherwise. The session is a client, connects to that endpoint, exits if the connection fails, and leaves multicast and gossip disabled. Return `"Start the simulator with npm run dev. It listens on tcp/127.0.0.1:7447. Set CEV_ZENOH_ENDPOINT only to match CEV_SIM_ZENOH_TCP_PORT (...)"` when the router does not answer. The parenthetical text is the Zenoh error. The simulator opens that TCP port for this repo and `ws://127.0.0.1:10000/` for the page. `config/zenoh-router.json5` is not the live router. How to start the simulator is in [getting started](../getting-started.md).
 
 `Transport::key(&self, suffix)`
 

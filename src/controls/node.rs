@@ -36,9 +36,10 @@ pub fn controlled_update(
             &ctx.transport.run,
             sequence,
             h.time_ns,
-            "map",
+            "base_link",
         )),
         state_sequence: h.sequence,
+        control_lease_id: ctx.info.control_lease_id.clone(),
         command: Some(protocol::convert(
             &crate::shared::types::DriveCommand::STOP,
         )?),

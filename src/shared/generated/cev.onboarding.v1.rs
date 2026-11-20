@@ -161,6 +161,8 @@ pub struct CommandUpdate {
     pub valid_until_ns: u64,
     #[prost(message, optional, tag = "6")]
     pub command: ::core::option::Option<DriveCommand>,
+    #[prost(string, tag = "7")]
+    pub control_lease_id: ::prost::alloc::string::String,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -183,6 +185,8 @@ pub struct RunInfo {
     pub mode: ::prost::alloc::string::String,
     #[prost(message, optional, tag = "9")]
     pub control_path: ::core::option::Option<Path>,
+    #[prost(string, tag = "10")]
+    pub control_lease_id: ::prost::alloc::string::String,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]

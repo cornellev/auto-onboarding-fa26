@@ -22,9 +22,9 @@ Call `perception.update`. If that returns `Some`, `validate` the grid and `conve
 
 Publish a `MapUpdate` whose `header` and `source` are that rewritten scan header, whose `state` is the paired vehicle state, and whose `availability` is `Ready` when a grid was produced and `NotReady` otherwise. The `grid` field is present only in the ready case. Then publish status: `"map published"` with `ready` true, or `"implement Perception::update"` with `ready` false, timed with the observation.
 
-After the first observation, return `"Perception source expired"` when 300 ms of wall time pass with no newer match. The sleep at the bottom of the loop is 5 ms, so the expiry check runs often enough to see that gap.
+A gap in matched scans does not end the loop. The next pose and scan from the same moment are published as usual. The sleep at the bottom of the loop is 5 ms.
 
-`poll` returning `false` ends the function with `Ok(())`. A router loss, a schema problem, or a stale source returns an error and the process exits. The car stops because commands stop arriving, and because a controls context publishes a stop on the way out.
+`poll` returning `false` ends the function with `Ok(())`. A router loss, a schema problem, or a stale matched observation returns an error and the process exits. The car stops because commands stop arriving, and because a controls context publishes a stop on the way out.
 
 ## What the loop asks of `update`
 
