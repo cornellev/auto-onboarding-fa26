@@ -16,7 +16,6 @@ impl Perception {
     /// This starter returns `None`, so the car stays stopped until you write it.
     /// The writeup is `docs/project.md`, under Perception.
     pub fn update(&mut self, observation: &Observation) -> Option<&Grid> {
-        // Edit me...
         let mut queue:VecDeque<(i64,i64,usize)> = VecDeque::new();
         for &pt in observation.scan.points.iter(){
             if let Some((col, row)) = self.map.cell(observation.state.pose.transform(observation.scan.sensor_in_vehicle.transform(pt))){
@@ -25,7 +24,6 @@ impl Perception {
         }
         self.propagate(queue, 2);
         Some(&self.map)
-        // ...till here.
     }
 
     pub fn propagate(&mut self, mut preloaded_queue: VecDeque<(i64,i64,usize)>, inflation_cells: usize){
